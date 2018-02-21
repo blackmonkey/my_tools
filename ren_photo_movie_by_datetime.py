@@ -4,6 +4,7 @@ import functools, os
 from tkinter import *
 from tkinter.ttk import *
 from tkinter.filedialog import askopenfilename, askdirectory
+from pprint import pprint
 import tkinter.messagebox as tmsgbox
 
 PAD = 2.5
@@ -79,8 +80,8 @@ class FilterPanel(Frame):
 			child.destroy()
 		self._filters.clear()
 
-		for ext, count, chosen in ext_infos:
-			self._filters[ext] = (count, BooleanVar(value = chosen))
+		for ext, count in ext_infos:
+			self._filters[ext] = (count, BooleanVar(value = True))
 			Checkbutton(self._filters_panel, text ='%s (%d)' % (ext, count), variable = self._filters[ext][1]).grid(column = 0, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
 			# TODO: find longest ext and calculate maximum item width by it.
 		self._on_filter_panel_configure(None)
@@ -102,8 +103,37 @@ class FilterPanel(Frame):
 			else:
 				c += 1
 
+SUPPORTED_SUFFIX = [
+	'.3fr', '.3g2', '.3gp', '.3gp2', '.3gpp',
+	'.aa', '.aax', '.acfm', '.acr', '.afm', '.aif', '.aifc', '.aiff', '.amfm', '.ape', '.arw', '.asf', '.avi',
+	'.bmp', '.bpg', '.btf',
+	'.ciff', '.cr2', '.crw', '.cs1',
+	'.dc3', '.dcm', '.dcp', '.dcr', '.dfont', '.dib', '.dic', '.dicm', '.divx', '.djv', '.djvu', '.dng', '.dpx', '.dr4', '.ds2', '.dss', '.dv', '.dvb',
+	'.eip', '.eps', '.epsf', '.erf', '.exif', '.exr', '.exv',
+	'.f4a', '.f4b', '.f4p', '.f4v', '.fff', '.flac', '.flif', '.flv', '.fpf', '.fpx',
+	'.gif', '.gpr',
+	'.hdp', '.hdr', '.heic', '.heif',
+	'.icc', '.icm', '.iiq', '.iso', '.itc',
+	'.j2c', '.j2k', '.jng', '.jp2', '.jpc', '.jpe', '.jpeg', '.jpf', '.jpg', '.jpm', '.jpx', '.jxr',
+	'.k25', '.kdc',
+	'.la', '.lfp', '.lfr',
+	'.m2t', '.m2ts', '.m2v', '.m4a', '.m4b', '.m4p', '.m4v', '.mef', '.mie', '.mif', '.miff', '.mka', '.mks', '.mkv', '.mng', '.modd', '.moi', '.mos', '.mov', '.mp3', '.mp4', '.mpc', '.mpeg', '.mpg', '.mpo', '.mqv', '.mrw', '.mts', '.mxf',
+	'.nef', '.nrw',
+	'.ofr', '.ogg', '.ogv', '.opus', '.orf', '.otf',
+	'.pac', '.pbm', '.pcd', '.pct', '.pdb', '.pef', '.pfa', '.pfb', '.pfm', '.pgf', '.pgm', '.pict', '.plist', '.pmp', '.png', '.ppm', '.prc', '.ps', '.psb', '.psd', '.psdt', '.psp', '.pspimage',
+	'.qif', '.qt', '.qti', '.qtif',
+	'.r3d', '.ra', '.raf', '.ram', '.raw', '.riff', '.rm', '.rw2', '.rwl', '.rwz',
+	'.seq', '.sr2', '.srf', '.srw', '.svg', '.swf',
+	'.thm', '.tif', '.tiff', '.ts', '.ttc', '.ttf',
+	'.vob', '.vrd', '.vsd',
+	'.wav', '.wdp', '.webm', '.webp', '.wma', '.wmv', '.wv',
+	'.x3f', '.xcf',
+]
+
 class RenameApp(Frame):
 	def __init__(self):
+		self._found_files = {}
+
 		root = Tk()
 		root.title('Rename Photo & Movie by Datetime - v3.0')
 		root.state('zoomed')
@@ -129,10 +159,30 @@ class RenameApp(Frame):
 		Label(self, text = 'TODO : found files and folders').grid(column = 0, row = 4, sticky = NSEW, padx = PAD, pady = PAD)
 
 	def _scan_photos(self):
+		photo_folder = self._config_panel.get_photo_path()
+		if not photo_folder:
+			tmsgbox.showwarning('Oops', 'Please specify the photo folder at first!')
+			return
+
+		self._found_files.clear()
+		found_count = 0
+		for root, dirs, files in os.walk(photo_folder):
+			for name in files:
+				_base, ext = os.path.splitext(name)
+				ext = ext.lower()
+				if ext in SUPPORTED_SUFFIX:
+					fname = os.path.join(root, name)
+					if ext not in self._found_files:
+						self._found_files[ext] = []
+					self._found_files[ext].append((name, fname))
+					found_count += 1
+
 		ext_infos = []
-		for i in range(20):
-			ext_infos.append(('.jpg' + str(i), i * 10000, i % 2 == 0))
+		for ext in self._found_files.keys():
+			ext_infos.append((ext, len(self._found_files[ext])))
 		self._filter_panel.show_extensions(ext_infos)
+
+		tmsgbox.showinfo('Done', 'Finished scaning photos, found %d files' % (found_count))
 
 	def _preview_renaming(self):
 		pass
