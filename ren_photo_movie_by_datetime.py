@@ -103,6 +103,41 @@ class FilterPanel(Frame):
 			else:
 				c += 1
 
+COL_NAME = 'Name'
+COL_RENAME = 'Rename'
+COL_TYPE = 'Type'
+COL_FOLDER = 'Path'
+class PreviewPanel(Frame):
+	def __init__(self, parent):
+		super(PreviewPanel, self).__init__(parent)
+
+		self._tree_view = Treeview(self, columns = (COL_NAME, COL_RENAME, COL_TYPE, COL_FOLDER), show = 'headings')
+		self._tree_view.column(COL_NAME, width = 200, anchor = W)
+		self._tree_view.column(COL_RENAME, width = 200, anchor = W)
+		self._tree_view.column(COL_TYPE, width = 50, anchor = W)
+		self._tree_view.column(COL_FOLDER, anchor = W)
+		self._tree_view.heading(COL_NAME, text = COL_NAME, anchor = W)
+		self._tree_view.heading(COL_RENAME, text = COL_RENAME, anchor = W)
+		self._tree_view.heading(COL_TYPE, text = COL_TYPE, anchor = W)
+		self._tree_view.heading(COL_FOLDER, text = COL_FOLDER, anchor = W)
+
+		vbar = Scrollbar(self, orient = VERTICAL, command = self._tree_view.yview)
+		self._tree_view.configure(yscrollcommand = vbar.set)
+
+		self._tree_view.grid(row = 0, column = 0, sticky = NSEW)
+		vbar.grid(row = 0, column = 1, sticky = NS)
+
+		self.grid_columnconfigure(0, weight = 1)
+		self.grid_rowconfigure(0, weight = 1)
+
+	def show_found_files(self, files):
+		self._tree_view.delete(*self._tree_view.get_children())
+		idx = 0
+		for ext in files.keys():
+			for root, name in files[ext]:
+				self._tree_view.insert('', idx, values = (name, '', ext, root))
+				idx += 1
+
 SUPPORTED_SUFFIX = [
 	'.3fr', '.3g2', '.3gp', '.3gp2', '.3gpp',
 	'.aa', '.aax', '.acfm', '.acr', '.afm', '.aif', '.aifc', '.aiff', '.amfm', '.ape', '.arw', '.asf', '.avi',
@@ -150,13 +185,13 @@ class RenameApp(Frame):
 	def _createWidgets(self):
 		self._config_panel = ConfigPanel(self)
 		self._filter_panel = FilterPanel(self, self._scan_photos, self._preview_renaming, self._do_rename)
+		self._preview_panel = PreviewPanel(self)
 
 		self._config_panel.grid(column = 0, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
 		Separator(self).grid(column = 0, row = 1, sticky = NSEW, padx = PAD)
 		self._filter_panel.grid(column = 0, row = 2, sticky = NSEW, padx = PAD, pady = PAD)
 		Separator(self).grid(column = 0, row = 3, sticky = NSEW, padx = PAD)
-
-		Label(self, text = 'TODO : found files and folders').grid(column = 0, row = 4, sticky = NSEW, padx = PAD, pady = PAD)
+		self._preview_panel.grid(column = 0, row = 4, sticky = NSEW, padx = PAD, pady = PAD)
 
 	def _scan_photos(self):
 		photo_folder = self._config_panel.get_photo_path()
@@ -171,16 +206,17 @@ class RenameApp(Frame):
 				_base, ext = os.path.splitext(name)
 				ext = ext.lower()
 				if ext in SUPPORTED_SUFFIX:
-					fname = os.path.join(root, name)
 					if ext not in self._found_files:
 						self._found_files[ext] = []
-					self._found_files[ext].append((name, fname))
+					self._found_files[ext].append((root, name))
 					found_count += 1
 
 		ext_infos = []
 		for ext in self._found_files.keys():
 			ext_infos.append((ext, len(self._found_files[ext])))
 		self._filter_panel.show_extensions(ext_infos)
+
+		self._preview_panel.show_found_files(self._found_files)
 
 		tmsgbox.showinfo('Done', 'Finished scaning photos, found %d files' % (found_count))
 
