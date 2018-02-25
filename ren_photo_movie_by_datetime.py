@@ -103,23 +103,40 @@ class FilterPanel(Frame):
 			else:
 				c += 1
 
+COL_SELECTED = '#0'
 COL_NAME = 'Name'
 COL_RENAME = 'Rename'
 COL_TYPE = 'Type'
 COL_FOLDER = 'Path'
+COL_SELECTED_TITLE = 'Selected'
+COL_NAME_TITLE = COL_NAME
+COL_RENAME_TITLE = COL_RENAME
+COL_TYPE_TITLE = COL_TYPE
+COL_FOLDER_TITLE = COL_FOLDER
+
+MARK_SELECTED = '☑'
+MARK_UNSELECTED = '☐'
+
+TAG_SELECTED = 'selected'
+TAG_UNSELECTED = 'unselected'
+
 class PreviewPanel(Frame):
 	def __init__(self, parent):
 		super(PreviewPanel, self).__init__(parent)
 
-		self._tree_view = Treeview(self, columns = (COL_NAME, COL_RENAME, COL_TYPE, COL_FOLDER), show = 'headings')
-		self._tree_view.column(COL_NAME, width = 200, anchor = W)
-		self._tree_view.column(COL_RENAME, width = 200, anchor = W)
-		self._tree_view.column(COL_TYPE, width = 50, anchor = W)
-		self._tree_view.column(COL_FOLDER, anchor = W)
-		self._tree_view.heading(COL_NAME, text = COL_NAME, anchor = W)
-		self._tree_view.heading(COL_RENAME, text = COL_RENAME, anchor = W)
-		self._tree_view.heading(COL_TYPE, text = COL_TYPE, anchor = W)
-		self._tree_view.heading(COL_FOLDER, text = COL_FOLDER, anchor = W)
+		self._tree_view = Treeview(self, columns = (COL_NAME, COL_RENAME, COL_TYPE, COL_FOLDER))
+		self._tree_view.column(COL_SELECTED, width = 60, stretch = False)
+		self._tree_view.column(COL_NAME, width = 200, stretch = False, anchor = W)
+		self._tree_view.column(COL_RENAME, width = 200, stretch = False, anchor = W)
+		self._tree_view.column(COL_TYPE, width = 50, stretch = False, anchor = W)
+		self._tree_view.column(COL_FOLDER, width = 800, stretch = False, anchor = W)
+		self._tree_view.heading(COL_SELECTED, text = COL_SELECTED_TITLE)
+		self._tree_view.heading(COL_NAME, text = COL_NAME_TITLE, anchor = W)
+		self._tree_view.heading(COL_RENAME, text = COL_RENAME_TITLE, anchor = W)
+		self._tree_view.heading(COL_TYPE, text = COL_TYPE_TITLE, anchor = W)
+		self._tree_view.heading(COL_FOLDER, text = COL_FOLDER_TITLE, anchor = W)
+		self._tree_view.tag_configure(TAG_SELECTED, foreground = 'black')
+		self._tree_view.tag_configure(TAG_UNSELECTED, foreground = 'lightgray')
 
 		vbar = Scrollbar(self, orient = VERTICAL, command = self._tree_view.yview)
 		self._tree_view.configure(yscrollcommand = vbar.set)
@@ -130,13 +147,30 @@ class PreviewPanel(Frame):
 		self.grid_columnconfigure(0, weight = 1)
 		self.grid_rowconfigure(0, weight = 1)
 
+		self._tree_view.bind("<Button-1>", self._treeview_on_clicked, True)
+
 	def show_found_files(self, files):
 		self._tree_view.delete(*self._tree_view.get_children())
-		idx = 0
 		for ext in files.keys():
 			for root, name in files[ext]:
-				self._tree_view.insert('', idx, values = (name, '', ext, root))
-				idx += 1
+				self._tree_view.insert('', 'end', text = MARK_SELECTED, values = [name, '', ext, root], tags = [TAG_SELECTED])
+
+	def _treeview_on_clicked(self, event):
+		x, y, widget = event.x, event.y, event.widget
+		col = self._tree_view.identify_column(x)
+		row = self._tree_view.identify_row(y)
+		if not row:
+			self._on_clicked_on_column_header(col)
+		elif col == COL_SELECTED:
+			item = self._tree_view.identify_row(y)
+			pprint(item)
+			if self._tree_view.tag_has(TAG_UNSELECTED, item):
+				self._tree_view.item(item, text = MARK_SELECTED, tags = [TAG_SELECTED])
+			else:
+				self._tree_view.item(item, text = MARK_UNSELECTED, tags = [TAG_UNSELECTED])
+
+	def _on_clicked_on_column_header(self, col):
+		pass
 
 SUPPORTED_SUFFIX = [
 	'.3fr', '.3g2', '.3gp', '.3gp2', '.3gpp',
