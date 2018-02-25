@@ -59,8 +59,10 @@ def cmp_ext_button(first_btn, second_btn):
 		return 1
 
 class FilterPanel(Frame):
-	def __init__(self, parent, scan_fun, preview_fun, rename_run):
+	def __init__(self, parent, scan_fun, preview_fun, rename_run, callback):
 		super(FilterPanel, self).__init__(parent)
+
+		self._checkbutton_changed_callback = callback
 
 		self._filters_panel = LabelFrame(self, labelanchor = NW, labelwidget = Label(text = 'Found file extensions:'))
 		self._filters_panel.grid(column = 0, row = 0, rowspan = 2, sticky = NSEW, padx = PAD, pady = PAD)
@@ -81,13 +83,14 @@ class FilterPanel(Frame):
 		self._filters.clear()
 
 		for ext, count in ext_infos:
-			self._filters[ext] = (count, BooleanVar(value = True))
-			chk_btn = Checkbutton(self._filters_panel, text ='%s (%d)' % (ext, count), variable = self._filters[ext][1])
+			var = BooleanVar(value = True)
+			self._filters[ext] = (count, var)
+			chk_btn = Checkbutton(self._filters_panel, text ='%s (%d)' % (ext, count), variable = var, command = lambda ext = ext, var = var: self._checkbutton_changed_callback(ext, var.get()))
 			chk_btn.grid(column = 0, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
 			# TODO: find longest ext and calculate maximum item width by it.
-		self._on_filter_panel_configure(None)
+		self._on_filter_panel_configure()
 
-	def _on_filter_panel_configure(self, event):
+	def _on_filter_panel_configure(self, event = None):
 		panel_width = self._filters_panel.winfo_width()
 		c = r = btns_width = 0
 		buttons = self._filters_panel.grid_slaves()
@@ -173,9 +176,9 @@ class PreviewPanel(Frame):
 			item = self._tree_view.identify_row(y)
 			unselected = self._tree_view.tag_has(TAG_UNSELECTED, item)
 			if unselected:
-				self._tree_view.item(item, text = MARK_SELECTED, tags = [TAG_SELECTED])
+				self._select_file(item)
 			else:
-				self._tree_view.item(item, text = MARK_UNSELECTED, tags = [TAG_UNSELECTED])
+				self._unselect_file(item)
 
 			if self._item_clicked_callback:
 				self._item_clicked_callback(unselected, self._tree_view.item(item, option = 'values'))
@@ -213,7 +216,25 @@ class PreviewPanel(Frame):
 		col_label += ' ↓' if reverse else ' ↑'
 
 		# reverse sort next time
-		self._tree_view.heading(col, text = col_label, command = lambda: self._treeview_sort_column(col, not reverse))
+		self._tree_view.heading(col, text = col_label, command = lambda col = col, reverse = reverse: self._treeview_sort_column(col, not reverse))
+
+	def _select_file(self, row_id):
+		self._tree_view.item(row_id, text = MARK_SELECTED, tags = [TAG_SELECTED])
+
+	def _unselect_file(self, row_id):
+		self._tree_view.item(row_id, text = MARK_UNSELECTED, tags = [TAG_UNSELECTED])
+
+	def select_files(self, files):
+		for k in self._tree_view.get_children():
+			name, new_name, ext, root = self._tree_view.item(k, option = 'values')
+			if (root, name, new_name) in files:
+				self._select_file(k)
+
+	def unselect_files(self, files):
+		for k in self._tree_view.get_children():
+			name, new_name, ext, root = self._tree_view.item(k, option = 'values')
+			if (root, name, new_name) in files:
+				self._unselect_file(k)
 
 SUPPORTED_SUFFIX = [
 	'.3fr', '.3g2', '.3gp', '.3gp2', '.3gpp',
@@ -262,7 +283,7 @@ class RenameApp(Frame):
 
 	def _createWidgets(self):
 		self._config_panel = ConfigPanel(self)
-		self._filter_panel = FilterPanel(self, self._scan_photos, self._preview_renaming, self._do_rename)
+		self._filter_panel = FilterPanel(self, self._scan_photos, self._preview_renaming, self._do_rename, self._on_ext_selected)
 		self._preview_panel = PreviewPanel(self, self._on_file_selected)
 
 		self._config_panel.grid(column = 0, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
@@ -311,6 +332,16 @@ class RenameApp(Frame):
 			self._selected_files[ext].remove(item)
 			if item not in self._unselected_files[ext]:
 				self._unselected_files[ext].append(item)
+
+	def _on_ext_selected(self, ext, selected):
+		if selected and ext in self._unselected_files:
+			self._preview_panel.select_files(self._unselected_files[ext])
+			self._selected_files[ext].extend(self._unselected_files[ext])
+			self._unselected_files[ext].clear()
+		elif not selected and ext in self._selected_files:
+			self._preview_panel.unselect_files(self._selected_files[ext])
+			self._unselected_files[ext].extend(self._selected_files[ext])
+			self._selected_files[ext].clear()
 
 	def _preview_renaming(self):
 		pass
