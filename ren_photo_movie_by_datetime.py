@@ -84,9 +84,9 @@ class FilterPanel(Frame):
 
 		for ext, count in ext_infos:
 			var = BooleanVar(value = True)
-			self._filters[ext] = (count, var)
 			chk_btn = Checkbutton(self._filters_panel, text ='%s (%d)' % (ext, count), variable = var, command = lambda ext = ext, var = var: self._checkbutton_changed_callback(ext, var.get()))
 			chk_btn.grid(column = 0, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
+			self._filters[ext] = (count, var, chk_btn)
 			# TODO: find longest ext and calculate maximum item width by it.
 		self._on_filter_panel_configure()
 
@@ -106,6 +106,15 @@ class FilterPanel(Frame):
 				r += 1
 			else:
 				c += 1
+
+	def update_ext_selection(self, ext, state):
+		if ext in self._filters:
+			count, var, btn = self._filters[ext]
+			if state == '':
+				btn.state(['alternate'])
+			else:
+				btn.state(['!alternate'])
+				var.set(state)
 
 COL_SELECTED = '#0'
 COL_NAME = 'Name'
@@ -332,6 +341,13 @@ class RenameApp(Frame):
 			self._selected_files[ext].remove(item)
 			if item not in self._unselected_files[ext]:
 				self._unselected_files[ext].append(item)
+
+		if len(self._selected_files[ext]) == 0:
+			self._filter_panel.update_ext_selection(ext, False)
+		elif len(self._unselected_files[ext]) == 0:
+			self._filter_panel.update_ext_selection(ext, True)
+		else:
+			self._filter_panel.update_ext_selection(ext, '')
 
 	def _on_ext_selected(self, ext, selected):
 		if selected and ext in self._unselected_files:
