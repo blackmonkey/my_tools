@@ -82,7 +82,8 @@ class FilterPanel(Frame):
 
 		for ext, count in ext_infos:
 			self._filters[ext] = (count, BooleanVar(value = True))
-			Checkbutton(self._filters_panel, text ='%s (%d)' % (ext, count), variable = self._filters[ext][1]).grid(column = 0, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
+			chk_btn = Checkbutton(self._filters_panel, text ='%s (%d)' % (ext, count), variable = self._filters[ext][1])
+			chk_btn.grid(column = 0, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
 			# TODO: find longest ext and calculate maximum item width by it.
 		self._on_filter_panel_configure(None)
 
@@ -145,7 +146,7 @@ class PreviewPanel(Frame):
 		self.grid_columnconfigure(0, weight = 1)
 		self.grid_rowconfigure(0, weight = 1)
 
-		self._tree_view.bind("<Button-1>", self._treeview_on_clicked, True)
+		self._tree_view.bind('<Button-1>', self._treeview_on_clicked, True)
 
 	def _init_column_headers(self):
 		self._tree_view.heading(COL_SELECTED, text = COL_SELECTED_TITLE, command = lambda: self._treeview_sort_column(COL_SELECTED, False))
@@ -297,7 +298,7 @@ class RenameApp(Frame):
 
 		self._preview_panel.show_found_files(self._selected_files)
 
-		tmsgbox.showinfo('Done', 'Finished scaning photos, found %d files' % (found_count))
+		tmsgbox.showinfo('Done', 'Finished scanning photos, found %d files' % (found_count))
 
 	def _on_file_selected(self, selected, values):
 		name, new_name, ext, root = values
@@ -317,5 +318,5 @@ class RenameApp(Frame):
 	def _do_rename(self):
 		pass
 
-if __name__ == "__main__":
+if __name__ == '__main__':
 	RenameApp()
