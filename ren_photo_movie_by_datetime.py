@@ -121,8 +121,10 @@ TAG_SELECTED = 'selected'
 TAG_UNSELECTED = 'unselected'
 
 class PreviewPanel(Frame):
-	def __init__(self, parent):
+	def __init__(self, parent, callback):
 		super(PreviewPanel, self).__init__(parent)
+
+		self._item_clicked_callback = callback
 
 		self._tree_view = Treeview(self, columns = (COL_NAME, COL_RENAME, COL_TYPE, COL_FOLDER))
 		self._tree_view.tag_configure(TAG_SELECTED, foreground = 'black')
@@ -159,8 +161,8 @@ class PreviewPanel(Frame):
 		self._tree_view.delete(*self._tree_view.get_children())
 
 		for ext in files.keys():
-			for root, name in files[ext]:
-				self._tree_view.insert('', 'end', text = MARK_SELECTED, values = [name, '', ext, root], tags = [TAG_SELECTED])
+			for root, name, new_name in files[ext]:
+				self._tree_view.insert('', 'end', text = MARK_SELECTED, values = [name, new_name, ext, root], tags = [TAG_SELECTED])
 
 	def _treeview_on_clicked(self, event):
 		x, y, widget = event.x, event.y, event.widget
@@ -168,10 +170,14 @@ class PreviewPanel(Frame):
 		row = self._tree_view.identify_row(y) # if row is empty, then the column header is clicked.
 		if col == COL_SELECTED and row: # if clicked on the first column and on the list item.
 			item = self._tree_view.identify_row(y)
-			if self._tree_view.tag_has(TAG_UNSELECTED, item):
+			unselected = self._tree_view.tag_has(TAG_UNSELECTED, item)
+			if unselected:
 				self._tree_view.item(item, text = MARK_SELECTED, tags = [TAG_SELECTED])
 			else:
 				self._tree_view.item(item, text = MARK_UNSELECTED, tags = [TAG_UNSELECTED])
+
+			if self._item_clicked_callback:
+				self._item_clicked_callback(unselected, self._tree_view.item(item, option = 'values'))
 
 	def _treeview_sort_column(self, col, reverse):
 		# get all the cell values on the specific column
@@ -237,7 +243,8 @@ SUPPORTED_SUFFIX = [
 
 class RenameApp(Frame):
 	def __init__(self):
-		self._found_files = {}
+		self._selected_files = {}
+		self._unselected_files = {}
 
 		root = Tk()
 		root.title('Rename Photo & Movie by Datetime - v3.0')
@@ -255,7 +262,7 @@ class RenameApp(Frame):
 	def _createWidgets(self):
 		self._config_panel = ConfigPanel(self)
 		self._filter_panel = FilterPanel(self, self._scan_photos, self._preview_renaming, self._do_rename)
-		self._preview_panel = PreviewPanel(self)
+		self._preview_panel = PreviewPanel(self, self._on_file_selected)
 
 		self._config_panel.grid(column = 0, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
 		Separator(self).grid(column = 0, row = 1, sticky = NSEW, padx = PAD)
@@ -269,26 +276,40 @@ class RenameApp(Frame):
 			tmsgbox.showwarning('Oops', 'Please specify the photo folder at first!')
 			return
 
-		self._found_files.clear()
+		self._selected_files.clear()
+		self._unselected_files.clear()
 		found_count = 0
 		for root, dirs, files in os.walk(photo_folder):
 			for name in files:
 				_base, ext = os.path.splitext(name)
 				ext = ext.lower()
 				if ext in SUPPORTED_SUFFIX:
-					if ext not in self._found_files:
-						self._found_files[ext] = []
-					self._found_files[ext].append((root, name))
+					if ext not in self._selected_files:
+						self._selected_files[ext] = []
+						self._unselected_files[ext] = []
+					self._selected_files[ext].append((root, name, ''))
 					found_count += 1
 
 		ext_infos = []
-		for ext in self._found_files.keys():
-			ext_infos.append((ext, len(self._found_files[ext])))
+		for ext in self._selected_files.keys():
+			ext_infos.append((ext, len(self._selected_files[ext])))
 		self._filter_panel.show_extensions(ext_infos)
 
-		self._preview_panel.show_found_files(self._found_files)
+		self._preview_panel.show_found_files(self._selected_files)
 
 		tmsgbox.showinfo('Done', 'Finished scaning photos, found %d files' % (found_count))
+
+	def _on_file_selected(self, selected, values):
+		name, new_name, ext, root = values
+		item = (root, name, new_name)
+		if selected and ext in self._unselected_files and item in self._unselected_files[ext]:
+			self._unselected_files[ext].remove(item)
+			if item not in self._selected_files[ext]:
+				self._selected_files[ext].append(item)
+		elif not selected and ext in self._selected_files and item in self._selected_files[ext]:
+			self._selected_files[ext].remove(item)
+			if item not in self._unselected_files[ext]:
+				self._unselected_files[ext].append(item)
 
 	def _preview_renaming(self):
 		pass
