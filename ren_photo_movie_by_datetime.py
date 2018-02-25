@@ -125,18 +125,14 @@ class PreviewPanel(Frame):
 		super(PreviewPanel, self).__init__(parent)
 
 		self._tree_view = Treeview(self, columns = (COL_NAME, COL_RENAME, COL_TYPE, COL_FOLDER))
+		self._tree_view.tag_configure(TAG_SELECTED, foreground = 'black')
+		self._tree_view.tag_configure(TAG_UNSELECTED, foreground = 'lightgray')
 		self._tree_view.column(COL_SELECTED, width = 60, stretch = False)
 		self._tree_view.column(COL_NAME, width = 200, stretch = False, anchor = W)
 		self._tree_view.column(COL_RENAME, width = 200, stretch = False, anchor = W)
 		self._tree_view.column(COL_TYPE, width = 50, stretch = False, anchor = W)
 		self._tree_view.column(COL_FOLDER, width = 800, stretch = False, anchor = W)
-		self._tree_view.heading(COL_SELECTED, text = COL_SELECTED_TITLE)
-		self._tree_view.heading(COL_NAME, text = COL_NAME_TITLE, anchor = W)
-		self._tree_view.heading(COL_RENAME, text = COL_RENAME_TITLE, anchor = W)
-		self._tree_view.heading(COL_TYPE, text = COL_TYPE_TITLE, anchor = W)
-		self._tree_view.heading(COL_FOLDER, text = COL_FOLDER_TITLE, anchor = W)
-		self._tree_view.tag_configure(TAG_SELECTED, foreground = 'black')
-		self._tree_view.tag_configure(TAG_UNSELECTED, foreground = 'lightgray')
+		self._init_column_headers()
 
 		vbar = Scrollbar(self, orient = VERTICAL, command = self._tree_view.yview)
 		self._tree_view.configure(yscrollcommand = vbar.set)
@@ -149,8 +145,19 @@ class PreviewPanel(Frame):
 
 		self._tree_view.bind("<Button-1>", self._treeview_on_clicked, True)
 
+	def _init_column_headers(self):
+		self._tree_view.heading(COL_SELECTED, text = COL_SELECTED_TITLE, command = lambda: self._treeview_sort_column(COL_SELECTED, False))
+		self._tree_view.heading(COL_NAME, text = COL_NAME_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_NAME, False))
+		self._tree_view.heading(COL_RENAME, text = COL_RENAME_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_RENAME, False))
+		self._tree_view.heading(COL_TYPE, text = COL_TYPE_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_TYPE, False))
+		self._tree_view.heading(COL_FOLDER, text = COL_FOLDER_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_FOLDER, False))
+
 	def show_found_files(self, files):
+		# reset all column headers
+		self._init_column_headers()
+
 		self._tree_view.delete(*self._tree_view.get_children())
+
 		for ext in files.keys():
 			for root, name in files[ext]:
 				self._tree_view.insert('', 'end', text = MARK_SELECTED, values = [name, '', ext, root], tags = [TAG_SELECTED])
@@ -158,19 +165,48 @@ class PreviewPanel(Frame):
 	def _treeview_on_clicked(self, event):
 		x, y, widget = event.x, event.y, event.widget
 		col = self._tree_view.identify_column(x)
-		row = self._tree_view.identify_row(y)
-		if not row:
-			self._on_clicked_on_column_header(col)
-		elif col == COL_SELECTED:
+		row = self._tree_view.identify_row(y) # if row is empty, then the column header is clicked.
+		if col == COL_SELECTED and row: # if clicked on the first column and on the list item.
 			item = self._tree_view.identify_row(y)
-			pprint(item)
 			if self._tree_view.tag_has(TAG_UNSELECTED, item):
 				self._tree_view.item(item, text = MARK_SELECTED, tags = [TAG_SELECTED])
 			else:
 				self._tree_view.item(item, text = MARK_UNSELECTED, tags = [TAG_UNSELECTED])
 
-	def _on_clicked_on_column_header(self, col):
-		pass
+	def _treeview_sort_column(self, col, reverse):
+		# get all the cell values on the specific column
+		if col == COL_SELECTED:
+			l = [(self._tree_view.tag_has(TAG_SELECTED, k), k) for k in self._tree_view.get_children()]
+		else:
+			l = [(self._tree_view.set(k, col), k) for k in self._tree_view.get_children()]
+
+		# sort the cell values
+		l.sort(reverse = reverse)
+
+		# rearrange items in sorted positions
+		for index, (val, k) in enumerate(l):
+			self._tree_view.move(k, '', index)
+
+		# reset all column headers
+		self._init_column_headers()
+
+		# get new column header label
+		col_label = ''
+		if col == COL_SELECTED:
+			col_label = COL_SELECTED_TITLE
+		elif col == COL_NAME:
+			col_label = COL_NAME_TITLE
+		elif col == COL_RENAME:
+			col_label = COL_RENAME_TITLE
+		elif col == COL_TYPE:
+			col_label = COL_TYPE_TITLE
+		elif col == COL_FOLDER:
+			col_label = COL_FOLDER_TITLE
+
+		col_label += ' ↓' if reverse else ' ↑'
+
+		# reverse sort next time
+		self._tree_view.heading(col, text = col_label, command = lambda: self._treeview_sort_column(col, not reverse))
 
 SUPPORTED_SUFFIX = [
 	'.3fr', '.3g2', '.3gp', '.3gp2', '.3gpp',
