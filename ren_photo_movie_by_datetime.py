@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import functools, os
+import codecs, functools, os
 from tkinter import *
 from tkinter.ttk import *
 from tkinter.filedialog import askopenfilename, askdirectory
@@ -271,6 +271,8 @@ SUPPORTED_SUFFIX = [
 	'.x3f', '.xcf',
 ]
 
+FOUND_FILES = 'files.txt'
+
 class RenameApp(Frame):
 	def __init__(self):
 		root = Tk()
@@ -289,6 +291,11 @@ class RenameApp(Frame):
 		self.pack(fill = BOTH, expand = True)
 
 		root.mainloop()
+
+		# try:
+		# 	os.remove(FOUND_FILES)
+		# except OSError:
+		# 	pass
 
 	def _createWidgets(self):
 		self._config_panel = ConfigPanel(self)
@@ -311,6 +318,7 @@ class RenameApp(Frame):
 
 		self._selected_files.clear()
 		self._unselected_files.clear()
+		full_paths = []
 		found_count = 0
 		for root, dirs, files in os.walk(photo_folder):
 			self._status_msg.set('scanning ' + root)
@@ -318,11 +326,16 @@ class RenameApp(Frame):
 				_base, ext = os.path.splitext(name)
 				ext = ext.lower()
 				if ext in SUPPORTED_SUFFIX:
+					full_paths.append(os.path.join(root, name) + '\n')
 					if ext not in self._selected_files:
 						self._selected_files[ext] = []
 						self._unselected_files[ext] = []
 					self._selected_files[ext].append((root, name, ''))
 					found_count += 1
+
+		fp = codecs.open(FOUND_FILES, 'w')
+		fp.writelines(full_paths)
+		fp.close()
 
 		ext_infos = []
 		for ext in self._selected_files.keys():
