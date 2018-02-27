@@ -8,11 +8,12 @@ from pprint import pprint
 import tkinter.messagebox as tmsgbox
 
 PAD = 2.5
+EXIF_CMD = 'exiftool.exe'
 
 class ConfigPanel(Frame):
 	def __init__(self, parent):
 		super(ConfigPanel, self).__init__(parent)
-		self._exif_path = StringVar(value = os.getcwd())
+		self._exif_path = StringVar()
 		self._photo_path = StringVar(value = os.getcwd())
 
 		exif_label = Label(self, text = 'ExifTool: ', foreground = 'blue', cursor = 'hand2')
@@ -26,6 +27,10 @@ class ConfigPanel(Frame):
 		Button(self, text = 'Browse ...', command = self._choose_photo).grid(column = 2, row = 1, sticky = NSEW, padx = PAD, pady = PAD)
 
 		self.grid_columnconfigure(1, weight = 1)
+
+		exif_path = os.path.join(os.getcwd(), EXIF_CMD)
+		if os.path.isfile(exif_path):
+			self._exif_path.set(exif_path)
 
 	def _choose_exif(self):
 		fpath = self._exif_path.get()
@@ -315,6 +320,11 @@ class RenameApp(Frame):
 		self._status_bar.grid(column = 0, row = 5, sticky = NSEW, padx = PAD, pady = PAD)
 
 	def _scan_photos(self):
+		exif_path = self._config_panel.get_exif_path()
+		if not exif_path or not os.path.isfile(exif_path):
+			tmsgbox.showwarning('Oops', 'Please specify exif tool at first!')
+			return
+
 		photo_folder = self._config_panel.get_photo_path()
 		if not photo_folder:
 			tmsgbox.showwarning('Oops', 'Please specify the photo folder at first!')
