@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import codecs, functools, os, webbrowser
+import functools, os, subprocess, threading, webbrowser
 from tkinter import *
 from tkinter.ttk import *
 from tkinter.filedialog import askopenfilename, askdirectory
@@ -123,6 +123,24 @@ class FilterPanel(Frame):
 			else:
 				btn.state(['!alternate'])
 				var.set(state)
+
+	def disable(self):
+		for child in self.winfo_children():
+			if isinstance(child, Button):
+				child.config(state = DISABLED)
+			elif isinstance(child, LabelFrame):
+				for childd in child.winfo_children():
+					if isinstance(childd, Checkbutton):
+						childd.config(state = DISABLED)
+
+	def enable(self):
+		for child in self.winfo_children():
+			if isinstance(child, Button):
+				child.config(state = NORMAL)
+			elif isinstance(child, LabelFrame):
+				for childd in child.winfo_children():
+					if isinstance(childd, Checkbutton):
+						childd.config(state = NORMAL)
 
 COL_SELECTED = '#0'
 COL_NAME = 'Name'
@@ -280,15 +298,16 @@ SUPPORTED_SUFFIX = [
 	'.x3f', '.xcf',
 ]
 
-FOUND_FILES = 'files.txt'
+FILES_TIMESTAMPS = 'files_timestamps.txt'
+EXIF_CMD_ARGS = r'%s "-*Date*" "-*Time*" "--*Run*" "--*Sub*" "--*Exposure*" "--*Timer*" "--*Region*" "--*Scale*" -r %s > ' + FILES_TIMESTAMPS
 
 class RenameApp(Frame):
 	def __init__(self):
-		root = Tk()
-		root.title('Rename Photo & Movie by Datetime - v3.0')
-		root.state('zoomed')
+		self._root = Tk()
+		self._root.title('Rename Photo & Movie by Datetime - v3.0')
+		self._root.state('zoomed')
 
-		super(RenameApp, self).__init__(root)
+		super(RenameApp, self).__init__(self._root)
 
 		self._selected_files = {}
 		self._unselected_files = {}
@@ -299,10 +318,10 @@ class RenameApp(Frame):
 		self.grid_rowconfigure(4, weight = 1)
 		self.pack(fill = BOTH, expand = True)
 
-		root.mainloop()
+		self._root.mainloop()
 
 		# try:
-		# 	os.remove(FOUND_FILES)
+		# 	os.remove(FILES_TIMESTAMPS)
 		# except OSError:
 		# 	pass
 
@@ -333,7 +352,6 @@ class RenameApp(Frame):
 		self._selected_files.clear()
 		self._unselected_files.clear()
 		full_paths = []
-		found_count = 0
 		for root, dirs, files in os.walk(photo_folder):
 			self._status_msg.set('scanning ' + root)
 			for name in files:
@@ -345,20 +363,37 @@ class RenameApp(Frame):
 						self._selected_files[ext] = []
 						self._unselected_files[ext] = []
 					self._selected_files[ext].append((root, name, ''))
-					found_count += 1
 
-		fp = codecs.open(FOUND_FILES, 'w')
-		fp.writelines(full_paths)
-		fp.close()
+		self._status_msg.set('Fetching timestamps of all supported files under %s ...' % (photo_folder))
+		cmds = EXIF_CMD_ARGS % (exif_path, photo_folder)
+		self._timestamp_thread = threading.Thread(target = self._get_timestamps, kwargs = {'cmds' : cmds})
+		self._timestamp_thread.start()
 
-		ext_infos = []
-		for ext in self._selected_files.keys():
-			ext_infos.append((ext, len(self._selected_files[ext])))
-		self._filter_panel.show_extensions(ext_infos)
+		self._filter_panel.disable()
+		self._root.after(100, self._check_timestamp_thread)
 
-		self._preview_panel.show_found_files(self._selected_files)
+		# fp = codecs.open(FILES_TIMESTAMPS, 'w')
+		# fp.writelines(full_paths)
+		# fp.close()
 
-		self._status_msg.set('Done, found %d files!' % (found_count))
+
+	def _get_timestamps(self, cmds):
+		subprocess.call(cmds, shell = True)
+
+	def _check_timestamp_thread(self):
+		if self._timestamp_thread.is_alive():
+			self._root.after(100, self._check_timestamp_thread)
+		else:
+			found_count = 0
+			ext_infos = []
+			for ext in self._selected_files.keys():
+				ext_infos.append((ext, len(self._selected_files[ext])))
+				found_count += len(self._selected_files[ext])
+
+			self._filter_panel.show_extensions(ext_infos)
+			self._filter_panel.enable()
+			self._preview_panel.show_found_files(self._selected_files)
+			self._status_msg.set('Done, found %d files!' % (found_count))
 
 	def _on_file_selected(self, selected, values):
 		name, new_name, ext, root = values
