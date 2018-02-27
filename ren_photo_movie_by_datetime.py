@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import codecs, functools, os
+import codecs, functools, os, webbrowser
 from tkinter import *
 from tkinter.ttk import *
 from tkinter.filedialog import askopenfilename, askdirectory
@@ -14,7 +14,9 @@ class ConfigPanel(Frame):
 		self._exif_path = StringVar(value = os.getcwd())
 		self._photo_path = StringVar(value = os.getcwd())
 
-		Label(self, text = 'ExifTool: ').grid(column = 0, row = 0, sticky = E, padx = PAD, pady = PAD)
+		exif_label = Label(self, text = 'ExifTool: ', foreground = 'blue', cursor = 'hand2')
+		exif_label.grid(column = 0, row = 0, sticky = E, padx = PAD, pady = PAD)
+		exif_label.bind('<Button-1>', lambda evt: webbrowser.open_new(r'https://sno.phy.queensu.ca/~phil/exiftool/'), True)
 		Label(self, text = 'Photo & Movie Folder: ').grid(column = 0, row = 1, sticky = E, padx = PAD, pady = PAD)
 		Entry(self, textvariable = self._exif_path).grid(column = 1, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
 		Entry(self, textvariable = self._photo_path).grid(column = 1, row = 1, sticky = NSEW, padx = PAD, pady = PAD)
