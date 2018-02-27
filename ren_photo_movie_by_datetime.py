@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import functools, os
 from tkinter import *
 from tkinter.ttk import *
@@ -274,14 +273,15 @@ SUPPORTED_SUFFIX = [
 
 class RenameApp(Frame):
 	def __init__(self):
-		self._selected_files = {}
-		self._unselected_files = {}
-
 		root = Tk()
 		root.title('Rename Photo & Movie by Datetime - v3.0')
 		root.state('zoomed')
 
 		super(RenameApp, self).__init__(root)
+
+		self._selected_files = {}
+		self._unselected_files = {}
+		self._status_msg = StringVar(value = 'ready.')
 
 		self._createWidgets()
 		self.grid_columnconfigure(0, weight = 1)
@@ -294,12 +294,14 @@ class RenameApp(Frame):
 		self._config_panel = ConfigPanel(self)
 		self._filter_panel = FilterPanel(self, self._scan_photos, self._preview_renaming, self._do_rename, self._on_ext_selected)
 		self._preview_panel = PreviewPanel(self, self._on_file_selected)
+		self._status_bar = Label(self, textvariable = self._status_msg, borderwidth = 1, relief = 'solid')
 
 		self._config_panel.grid(column = 0, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
 		Separator(self).grid(column = 0, row = 1, sticky = NSEW, padx = PAD)
 		self._filter_panel.grid(column = 0, row = 2, sticky = NSEW, padx = PAD, pady = PAD)
 		Separator(self).grid(column = 0, row = 3, sticky = NSEW, padx = PAD)
 		self._preview_panel.grid(column = 0, row = 4, sticky = NSEW, padx = PAD, pady = PAD)
+		self._status_bar.grid(column = 0, row = 5, sticky = NSEW, padx = PAD, pady = PAD)
 
 	def _scan_photos(self):
 		photo_folder = self._config_panel.get_photo_path()
@@ -311,6 +313,7 @@ class RenameApp(Frame):
 		self._unselected_files.clear()
 		found_count = 0
 		for root, dirs, files in os.walk(photo_folder):
+			self._status_msg.set('scanning ' + root)
 			for name in files:
 				_base, ext = os.path.splitext(name)
 				ext = ext.lower()
@@ -328,7 +331,7 @@ class RenameApp(Frame):
 
 		self._preview_panel.show_found_files(self._selected_files)
 
-		tmsgbox.showinfo('Done', 'Finished scanning photos, found %d files' % (found_count))
+		self._status_msg.set('Done, found %d files!' % (found_count))
 
 	def _on_file_selected(self, selected, values):
 		name, new_name, ext, root = values
