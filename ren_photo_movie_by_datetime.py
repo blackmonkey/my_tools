@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-import functools, os, subprocess, threading, webbrowser
+import codecs, functools, os, re, subprocess, threading, webbrowser
+from datetime import datetime
 from tkinter import *
 from tkinter.ttk import *
 from tkinter.filedialog import askopenfilename, askdirectory
@@ -102,7 +103,7 @@ class FilterPanel(Frame):
 		panel_width = self._filters_panel.winfo_width()
 		c = r = btns_width = 0
 		buttons = self._filters_panel.grid_slaves()
-		buttons.sort(key=functools.cmp_to_key(cmp_ext_button))
+		buttons.sort(key = functools.cmp_to_key(cmp_ext_button))
 		for btn in buttons:
 			ginfo = btn.grid_info()
 			if ginfo['column'] != c or ginfo['row'] != r:
@@ -384,6 +385,18 @@ class RenameApp(Frame):
 		if self._timestamp_thread.is_alive():
 			self._root.after(100, self._check_timestamp_thread)
 		else:
+			size = 0
+			try:
+				size = os.path.getsize(FILES_TIMESTAMPS)
+			except OSError:
+				pass
+			if size == 0:
+				tmsgbox.showwarning('Oops', 'Failed to get timestamps of the files!')
+				return
+
+			timestamps = self._parse_timestamps()
+			pprint(timestamps) #TODO: merge this with found files.
+
 			found_count = 0
 			ext_infos = []
 			for ext in self._selected_files.keys():
@@ -394,6 +407,90 @@ class RenameApp(Frame):
 			self._filter_panel.enable()
 			self._preview_panel.show_found_files(self._selected_files)
 			self._status_msg.set('Done, found %d files!' % (found_count))
+
+	def _parse_timestamps(self):
+		fp = codecs.open(FILES_TIMESTAMPS, 'r')
+		lines = fp.readlines()
+		fp.close()
+
+		file_timestamps = {}
+		last_fpath = None
+		for l in lines:
+			if l.startswith(' '):
+				continue
+			elif l.startswith('======== '):
+				if last_fpath:
+					self._merge_timestamps(file_timestamps, last_fpath)
+				last_fpath = l[9:].strip().replace('/', os.path.sep)
+				file_timestamps[last_fpath] = []
+			else:
+				tag, ts = self._parse_timestamp(l.strip())
+				if ts:
+					file_timestamps[last_fpath].append((tag, ts))
+		self._merge_timestamps(file_timestamps, last_fpath)
+		return file_timestamps
+
+	def _parse_timestamp(self, text):
+		tag, value = [part.strip() for part in text.split(':', 1)]
+		ts, suffix = re.findall(r'^([0-9: .]+)(.*)$', value)[0]
+		if ':' not in ts:
+			return (tag, None)
+
+		is_utc0 = True if (suffix and suffix[0] == 'Z') or tag.startswith('GPS ') else False
+
+		parts = re.split(r'[ :.]', ts)
+		if len(parts) == 7:
+			# valid date time
+			pass
+		elif len(parts) == 6:
+			parts.append('0')
+		elif len(parts) == 3 and len(parts[0]) == 4:
+			# it is a date, append 0 time
+			parts.extend(['0', '0', '0', '0'])
+		elif len(parts) in [3, 4] and len(parts[0]) == 2:
+			# it is a time, insert 0 date
+			parts = ['1970', '1', '1'] + parts
+		else:
+			print('invalid ts:', text, '->', parts)
+			return (tag, None)
+
+		ts = [int(s) for s in parts]
+		ts = datetime(ts[0], ts[1], ts[2], ts[3], ts[4], ts[5], ts[6] * 1000)
+		if is_utc0:
+			ts = self._utc0_to_local(ts)
+
+		return (tag, ts)
+
+	def _utc0_to_local(self, ts):
+		return ts + (datetime.now() - datetime.utcnow())
+
+	def _local_to_utc0(self, ts):
+		return ts - (datetime.now() - datetime.utcnow())
+
+	def _merge_local_date_time(self, date, time):
+		date = self._local_to_utc0(date)
+		time = self._local_to_utc0(time)
+		ts = date + (time - datetime(1970, 1, 1))
+		return self._utc0_to_local(ts)
+
+	def _merge_timestamps(self, timestamps, key):
+		# merge GPS Date with GPS Time
+		gps_date, gps_time, full_ts = [], [], []
+		for tag, ts in timestamps[key]:
+			if tag == 'GPS Date Stamp':
+				gps_date.append(ts)
+			elif tag == 'GPS Time Stamp':
+				gps_time.append(ts)
+			else:
+				full_ts.append((tag, ts))
+		full_ts.extend([('GPS Date/Time', self._merge_local_date_time(d, t)) for d in gps_date for t in gps_time])
+
+		# return unique (tag, timestamp)
+		full_ts.sort(key = lambda x: x[1])
+		timestamps[key].clear()
+		for tag_ts in full_ts:
+			if not timestamps[key] or tag_ts != timestamps[key][-1]:
+				timestamps[key].append(tag_ts)
 
 	def _on_file_selected(self, selected, values):
 		name, new_name, ext, root = values
