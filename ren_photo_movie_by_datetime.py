@@ -302,6 +302,26 @@ SUPPORTED_SUFFIX = [
 FILES_TIMESTAMPS = 'files_timestamps.txt'
 EXIF_CMD_ARGS = r'%s "-*Date*" "-*Time*" "--*Run*" "--*Sub*" "--*Exposure*" "--*Timer*" "--*Region*" "--*Scale*" -r %s > ' + FILES_TIMESTAMPS
 
+class TimestampInfo():
+	def __init__(self, tag, timestamp):
+		self._tag = tag
+		self._timestamp = timestamp
+
+	def __str__(self):
+		return 'TimestampInfo("%s", %s)' % (self._tag, self._timestamp)
+
+	def __repr__(self):
+		return self.__str__()
+
+	def __eq__(self, other):
+		return isinstance(other, TimestampInfo) and self._tag == other.tag() and self._timestamp == other.timestamp()
+
+	def tag(self):
+		return self._tag
+
+	def timestamp(self):
+		return self._timestamp
+
 class RenameApp(Frame):
 	def __init__(self):
 		self._root = Tk()
@@ -352,14 +372,12 @@ class RenameApp(Frame):
 
 		self._selected_files.clear()
 		self._unselected_files.clear()
-		full_paths = []
 		for root, dirs, files in os.walk(photo_folder):
 			self._status_msg.set('scanning ' + root)
 			for name in files:
 				_base, ext = os.path.splitext(name)
 				ext = ext.lower()
 				if ext in SUPPORTED_SUFFIX:
-					full_paths.append(os.path.join(root, name) + '\n')
 					if ext not in self._selected_files:
 						self._selected_files[ext] = []
 						self._unselected_files[ext] = []
@@ -373,11 +391,7 @@ class RenameApp(Frame):
 		self._filter_panel.disable()
 		self._root.after(100, self._check_timestamp_thread)
 
-		# fp = codecs.open(FILES_TIMESTAMPS, 'w')
-		# fp.writelines(full_paths)
-		# fp.close()
-
-
+	# TODO: merge this method to lambda
 	def _get_timestamps(self, cmds):
 		subprocess.call(cmds, shell = True)
 
@@ -424,9 +438,9 @@ class RenameApp(Frame):
 				last_fpath = l[9:].strip().replace('/', os.path.sep)
 				file_timestamps[last_fpath] = []
 			else:
-				tag, ts = self._parse_timestamp(l.strip())
-				if ts:
-					file_timestamps[last_fpath].append((tag, ts))
+				info = self._parse_timestamp(l.strip())
+				if info:
+					file_timestamps[last_fpath].append(info)
 		self._merge_timestamps(file_timestamps, last_fpath)
 		return file_timestamps
 
@@ -434,7 +448,7 @@ class RenameApp(Frame):
 		tag, value = [part.strip() for part in text.split(':', 1)]
 		ts, suffix = re.findall(r'^([0-9: .]+)(.*)$', value)[0]
 		if ':' not in ts:
-			return (tag, None)
+			return None
 
 		is_utc0 = True if (suffix and suffix[0] == 'Z') or tag.startswith('GPS ') else False
 
@@ -452,14 +466,14 @@ class RenameApp(Frame):
 			parts = ['1970', '1', '1'] + parts
 		else:
 			print('invalid ts:', text, '->', parts)
-			return (tag, None)
+			return None
 
 		ts = [int(s) for s in parts]
 		ts = datetime(ts[0], ts[1], ts[2], ts[3], ts[4], ts[5], ts[6] * 1000)
 		if is_utc0:
 			ts = self._utc0_to_local(ts)
 
-		return (tag, ts)
+		return TimestampInfo(tag, ts)
 
 	def _utc0_to_local(self, ts):
 		return ts + (datetime.now() - datetime.utcnow())
@@ -476,21 +490,21 @@ class RenameApp(Frame):
 	def _merge_timestamps(self, timestamps, key):
 		# merge GPS Date with GPS Time
 		gps_date, gps_time, full_ts = [], [], []
-		for tag, ts in timestamps[key]:
-			if tag == 'GPS Date Stamp':
-				gps_date.append(ts)
-			elif tag == 'GPS Time Stamp':
-				gps_time.append(ts)
+		for info in timestamps[key]:
+			if info.tag() == 'GPS Date Stamp':
+				gps_date.append(info.timestamp())
+			elif info.tag() == 'GPS Time Stamp':
+				gps_time.append(info.timestamp())
 			else:
-				full_ts.append((tag, ts))
-		full_ts.extend([('GPS Date/Time', self._merge_local_date_time(d, t)) for d in gps_date for t in gps_time])
+				full_ts.append(info)
+		full_ts.extend([TimestampInfo('GPS Date/Time', self._merge_local_date_time(d, t)) for d in gps_date for t in gps_time])
 
 		# return unique (tag, timestamp)
-		full_ts.sort(key = lambda x: x[1])
+		full_ts.sort(key = lambda x: x.timestamp())
 		timestamps[key].clear()
-		for tag_ts in full_ts:
-			if not timestamps[key] or tag_ts != timestamps[key][-1]:
-				timestamps[key].append(tag_ts)
+		for info in full_ts:
+			if not timestamps[key] or info != timestamps[key][-1]:
+				timestamps[key].append(info)
 
 	def _on_file_selected(self, selected, values):
 		name, new_name, ext, root = values
