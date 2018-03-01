@@ -194,15 +194,20 @@ class PreviewPanel(Frame):
 		self._tree_view.heading(COL_TYPE, text = COL_TYPE_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_TYPE, False))
 		self._tree_view.heading(COL_FOLDER, text = COL_FOLDER_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_FOLDER, False))
 
-	def show_found_files(self, files):
+	def show_files(self, files):
 		# reset all column headers
 		self._init_column_headers()
 
 		self._tree_view.delete(*self._tree_view.get_children())
 
 		for ext in files.keys():
-			for root, name, new_name in files[ext]:
-				self._tree_view.insert('', 'end', text = MARK_SELECTED, values = [name, new_name, ext, root], tags = [TAG_SELECTED])
+			for info in files[ext]:
+				values = [info.basename(), info.new_name(), ext, info.path()]
+				if info.selected():
+					text, tag = MARK_SELECTED, TAG_SELECTED
+				else:
+					text, tag = MARK_UNSELECTED, TAG_UNSELECTED
+				self._tree_view.insert('', 'end', text = text, values = values, tags = [tag])
 
 	def _treeview_on_clicked(self, event):
 		x, y, widget = event.x, event.y, event.widget
@@ -263,14 +268,18 @@ class PreviewPanel(Frame):
 	def select_files(self, files):
 		for k in self._tree_view.get_children():
 			name, new_name, ext, root = self._tree_view.item(k, option = 'values')
-			if (root, name, new_name) in files:
-				self._select_file(k)
+			for info in files:
+				if info.basename() == name and info.path() == root:
+					self._select_file(k)
+					break
 
 	def unselect_files(self, files):
 		for k in self._tree_view.get_children():
 			name, new_name, ext, root = self._tree_view.item(k, option = 'values')
-			if (root, name, new_name) in files:
-				self._unselect_file(k)
+			for info in files:
+				if info.basename() == name and info.path() == root:
+					self._unselect_file(k)
+					break
 
 SUPPORTED_SUFFIX = [
 	'.3fr', '.3g2', '.3gp', '.3gp2', '.3gpp',
@@ -322,6 +331,35 @@ class TimestampInfo():
 	def timestamp(self):
 		return self._timestamp
 
+class FileInfo():
+	def __init__(self, basename = '', path = '', timestamps = []):
+		self._basename = basename
+		self._new_name = ''
+		self._path = path
+		self._timestamps = timestamps
+		self._selected = True
+
+	def basename(self):
+		return self._basename
+
+	def new_name(self):
+		return self._new_name
+
+	def path(self):
+		return self._path
+
+	def timestamps(self):
+		return self._timestamps
+
+	def selected(self):
+		return self._selected
+
+	def select(self):
+		self._selected = True
+
+	def unselect(self):
+		self._selected = False
+
 class RenameApp(Frame):
 	def __init__(self):
 		self._root = Tk()
@@ -330,8 +368,7 @@ class RenameApp(Frame):
 
 		super(RenameApp, self).__init__(self._root)
 
-		self._selected_files = {}
-		self._unselected_files = {}
+		self._found_files = {}
 		self._status_msg = StringVar(value = 'ready.')
 
 		self._createWidgets()
@@ -370,18 +407,16 @@ class RenameApp(Frame):
 			tmsgbox.showwarning('Oops', 'Please specify the photo folder at first!')
 			return
 
-		self._selected_files.clear()
-		self._unselected_files.clear()
+		self._found_files.clear()
 		for root, dirs, files in os.walk(photo_folder):
 			self._status_msg.set('scanning ' + root)
 			for name in files:
 				_base, ext = os.path.splitext(name)
 				ext = ext.lower()
 				if ext in SUPPORTED_SUFFIX:
-					if ext not in self._selected_files:
-						self._selected_files[ext] = []
-						self._unselected_files[ext] = []
-					self._selected_files[ext].append((root, name, ''))
+					if ext not in self._found_files:
+						self._found_files[ext] = []
+					self._found_files[ext].append(FileInfo(name, root))
 
 		self._status_msg.set('Fetching timestamps of all supported files under %s ...' % (photo_folder))
 		cmds = EXIF_CMD_ARGS % (exif_path, photo_folder)
@@ -409,17 +444,17 @@ class RenameApp(Frame):
 				return
 
 			timestamps = self._parse_timestamps()
-			pprint(timestamps) #TODO: merge this with found files.
+#			pprint(timestamps) #TODO: merge this with found files.
 
 			found_count = 0
 			ext_infos = []
-			for ext in self._selected_files.keys():
-				ext_infos.append((ext, len(self._selected_files[ext])))
-				found_count += len(self._selected_files[ext])
+			for ext in self._found_files.keys():
+				ext_infos.append((ext, len(self._found_files[ext])))
+				found_count += len(self._found_files[ext])
 
 			self._filter_panel.show_extensions(ext_infos)
 			self._filter_panel.enable()
-			self._preview_panel.show_found_files(self._selected_files)
+			self._preview_panel.show_files(self._found_files)
 			self._status_msg.set('Done, found %d files!' % (found_count))
 
 	def _parse_timestamps(self):
@@ -508,32 +543,43 @@ class RenameApp(Frame):
 
 	def _on_file_selected(self, selected, values):
 		name, new_name, ext, root = values
-		item = (root, name, new_name)
-		if selected and ext in self._unselected_files and item in self._unselected_files[ext]:
-			self._unselected_files[ext].remove(item)
-			if item not in self._selected_files[ext]:
-				self._selected_files[ext].append(item)
-		elif not selected and ext in self._selected_files and item in self._selected_files[ext]:
-			self._selected_files[ext].remove(item)
-			if item not in self._unselected_files[ext]:
-				self._unselected_files[ext].append(item)
+		if ext not in self._found_files:
+			return
 
-		if len(self._selected_files[ext]) == 0:
+		select_count, unselect_count = 0, 0
+
+		for info in self._found_files[ext]:
+			if info.basename() == name and info.path() == root:
+				if selected:
+					info.select()
+				else:
+					info.unselect()
+			if info.selected():
+				select_count += 1
+			else:
+				unselect_count += 1
+
+		if select_count == 0:
 			self._filter_panel.update_ext_selection(ext, False)
-		elif len(self._unselected_files[ext]) == 0:
+		elif unselect_count == 0:
 			self._filter_panel.update_ext_selection(ext, True)
 		else:
 			self._filter_panel.update_ext_selection(ext, '')
 
 	def _on_ext_selected(self, ext, selected):
-		if selected and ext in self._unselected_files:
-			self._preview_panel.select_files(self._unselected_files[ext])
-			self._selected_files[ext].extend(self._unselected_files[ext])
-			self._unselected_files[ext].clear()
-		elif not selected and ext in self._selected_files:
-			self._preview_panel.unselect_files(self._selected_files[ext])
-			self._unselected_files[ext].extend(self._selected_files[ext])
-			self._selected_files[ext].clear()
+		if ext not in self._found_files:
+			return
+
+		if selected:
+			self._preview_panel.select_files(self._found_files[ext])
+		else:
+			self._preview_panel.unselect_files(self._found_files[ext])
+
+		for info in self._found_files[ext]:
+			if selected:
+				info.select()
+			else:
+				info.unselect()
 
 	def _preview_renaming(self):
 		pass
