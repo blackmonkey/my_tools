@@ -361,6 +361,17 @@ class FileInfo():
 	def unselect(self):
 		self._selected = False
 
+	def set_timestamps(self, timestamps):
+		self._timestamps.clear()
+		self._timestamps.extend(timestamps)
+		self._gen_new_name()
+
+	def _gen_new_name(self):
+		if self._timestamps:
+			ts = self._timestamps[0].timestamp().strftime('%Y%m%d_%H%M%S')
+			_base, ext = os.path.splitext(self._basename)
+			self._new_name = ts + ext.lower()
+
 class RenameApp(Frame):
 	def __init__(self):
 		self._root = Tk()
@@ -445,7 +456,7 @@ class RenameApp(Frame):
 				return
 
 			timestamps = self._parse_timestamps()
-#			pprint(timestamps) #TODO: merge this with found files.
+			self._assign_timestamps(timestamps)
 
 			found_count = 0
 			ext_infos = []
@@ -494,6 +505,16 @@ class RenameApp(Frame):
 					file_timestamps[last_fpath].append(info)
 		self._merge_timestamps(file_timestamps, last_fpath)
 		return file_timestamps
+
+	def _assign_timestamps(self, timestamps):
+		for fpath in timestamps:
+			path, fname = os.path.split(fpath)
+			_base, ext = os.path.splitext(fname)
+			ext = ext.lower()
+			if ext in self._found_files:
+				for finfo in self._found_files[ext]:
+					if finfo.basename() == fname and finfo.path() == path:
+						finfo.set_timestamps(timestamps[fpath])
 
 	def _parse_timestamp(self, text):
 		tag, value = [part.strip() for part in text.split(':', 1)]
