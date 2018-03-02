@@ -444,7 +444,6 @@ class RenameApp(Frame):
 
 		self._found_files.sort(key = key, reverse = self._files_sort_asc)
 
-	# TODO: merge this method to lambda
 	def _get_timestamps(self, cmds):
 		subprocess.call(cmds, shell = True)
 
