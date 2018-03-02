@@ -91,11 +91,12 @@ class FilterPanel(Frame):
 			child.destroy()
 		self._filters.clear()
 
-		for ext, count in ext_infos:
+		for ext, count, state in ext_infos:
 			var = BooleanVar(value = True)
 			chk_btn = Checkbutton(self._filters_panel, text ='%s (%d)' % (ext, count), variable = var, command = lambda ext = ext, var = var: self._checkbutton_changed_callback(ext, var.get()))
 			chk_btn.grid(column = 0, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
 			self._filters[ext] = (count, var, chk_btn)
+			self.update_ext_selection(ext, state)
 			# TODO: find longest ext and calculate maximum item width by it.
 		self._on_filter_panel_configure()
 
@@ -449,8 +450,23 @@ class RenameApp(Frame):
 			found_count = 0
 			ext_infos = []
 			for ext in self._found_files.keys():
-				ext_infos.append((ext, len(self._found_files[ext])))
-				found_count += len(self._found_files[ext])
+				cnt = len(self._found_files[ext])
+				found_count += cnt
+
+				select_count = unselect_count = 0
+				for info in self._found_files[ext]:
+					if info.selected():
+						select_count += 1
+					else:
+						unselect_count += 1
+
+				chk_btn_state = ''
+				if select_count == 0:
+					chk_btn_state = False
+				elif unselect_count == 0:
+					chk_btn_state = True
+
+				ext_infos.append((ext, cnt, chk_btn_state))
 
 			self._filter_panel.show_extensions(ext_infos)
 			self._filter_panel.enable()
@@ -546,7 +562,7 @@ class RenameApp(Frame):
 		if ext not in self._found_files:
 			return
 
-		select_count, unselect_count = 0, 0
+		select_count = unselect_count = 0
 
 		for info in self._found_files[ext]:
 			if info.basename() == name and info.path() == root:
