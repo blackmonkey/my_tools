@@ -83,21 +83,39 @@ class FilterPanel(Frame):
 
 		self.grid_columnconfigure(0, weight = 1)
 
-		self._filters = {}
-
-	def show_extensions(self, ext_infos):
+	def show_extensions(self, files):
 		for child in self._filters_panel.winfo_children():
 			child.forget()
 			child.destroy()
-		self._filters.clear()
 
-		for ext, count, state in ext_infos:
+		ext_infos = {}
+		exts = []
+		for finfo in files:
+			ext = finfo.ext()
+			if ext not in ext_infos:
+				ext_infos[ext] = [0, 0]
+				exts.append(ext)
+			if finfo.selected():
+				ext_infos[ext][0] += 1
+			else:
+				ext_infos[ext][1] += 1
+
+		exts.sort()
+		for ext in exts:
 			var = BooleanVar(value = True)
+			count = sum(ext_infos[ext])
 			chk_btn = Checkbutton(self._filters_panel, text ='%s (%d)' % (ext, count), variable = var, command = lambda ext = ext, var = var: self._checkbutton_changed_callback(ext, var.get()))
 			chk_btn.grid(column = 0, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
-			self._filters[ext] = (count, var, chk_btn)
-			self.update_ext_selection(ext, state)
-			# TODO: find longest ext and calculate maximum item width by it.
+
+			chk_btn.state(['alternate'])
+			if ext_infos[ext][0] == 0: # no selected files
+				chk_btn.state(['!alternate'])
+				var.set(False)
+			elif ext_infos[ext][1] == 0: # no unselected files
+				chk_btn.state(['!alternate'])
+				var.set(True)
+
+		# TODO: find longest ext and calculate maximum item width by it.
 		self._on_filter_panel_configure()
 
 	def _on_filter_panel_configure(self, event = None):
@@ -116,15 +134,6 @@ class FilterPanel(Frame):
 				r += 1
 			else:
 				c += 1
-
-	def update_ext_selection(self, ext, state):
-		if ext in self._filters:
-			count, var, btn = self._filters[ext]
-			if state == '':
-				btn.state(['alternate'])
-			else:
-				btn.state(['!alternate'])
-				var.set(state)
 
 	def disable(self):
 		for child in self.winfo_children():
@@ -162,10 +171,11 @@ TAG_SELECTED = 'selected'
 TAG_UNSELECTED = 'unselected'
 
 class PreviewPanel(Frame):
-	def __init__(self, parent, callback):
+	def __init__(self, parent, item_callback, header_callback):
 		super(PreviewPanel, self).__init__(parent)
 
-		self._item_clicked_callback = callback
+		self._item_clicked_callback = item_callback
+		self._header_clicked_callback = header_callback
 
 		self._tree_view = Treeview(self, columns = (COL_NAME, COL_RENAME, COL_TYPE, COL_FOLDER))
 		self._tree_view.tag_configure(TAG_SELECTED, foreground = 'black')
@@ -189,98 +199,67 @@ class PreviewPanel(Frame):
 		self._tree_view.bind('<Button-1>', self._treeview_on_clicked, True)
 
 	def _init_column_headers(self):
-		self._tree_view.heading(COL_SELECTED, text = COL_SELECTED_TITLE, command = lambda: self._treeview_sort_column(COL_SELECTED, False))
-		self._tree_view.heading(COL_NAME, text = COL_NAME_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_NAME, False))
-		self._tree_view.heading(COL_RENAME, text = COL_RENAME_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_RENAME, False))
-		self._tree_view.heading(COL_TYPE, text = COL_TYPE_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_TYPE, False))
-		self._tree_view.heading(COL_FOLDER, text = COL_FOLDER_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_FOLDER, False))
+		self._tree_view.heading(COL_SELECTED, text = COL_SELECTED_TITLE, command = lambda: self._treeview_sort_column(COL_SELECTED))
+		self._tree_view.heading(COL_NAME, text = COL_NAME_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_NAME))
+		self._tree_view.heading(COL_RENAME, text = COL_RENAME_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_RENAME))
+		self._tree_view.heading(COL_TYPE, text = COL_TYPE_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_TYPE))
+		self._tree_view.heading(COL_FOLDER, text = COL_FOLDER_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_FOLDER))
 
-	def show_files(self, files):
+	def show_files(self, files, sorted_header, asc):
 		# reset all column headers
 		self._init_column_headers()
+
+		# update sorted header
+		if sorted_header:
+			# get new column header label
+			col_label = ''
+			if sorted_header == COL_SELECTED:
+				col_label = COL_SELECTED_TITLE
+			elif sorted_header == COL_NAME:
+				col_label = COL_NAME_TITLE
+			elif sorted_header == COL_RENAME:
+				col_label = COL_RENAME_TITLE
+			elif sorted_header == COL_TYPE:
+				col_label = COL_TYPE_TITLE
+			elif sorted_header == COL_FOLDER:
+				col_label = COL_FOLDER_TITLE
+
+			col_label += ' ↓' if asc else ' ↑'
+			self._tree_view.heading(sorted_header, text = col_label)
 
 		self._tree_view.delete(*self._tree_view.get_children())
 
-		for ext in files.keys():
-			for info in files[ext]:
-				values = [info.basename(), info.new_name(), ext, info.path()]
-				if info.selected():
-					text, tag = MARK_SELECTED, TAG_SELECTED
-				else:
-					text, tag = MARK_UNSELECTED, TAG_UNSELECTED
-				self._tree_view.insert('', 'end', text = text, values = values, tags = [tag])
+		for info in files:
+			values = [info.fname(), info.new_fname(), info.ext(), info.path()]
+			if info.selected():
+				text, tag = MARK_SELECTED, TAG_SELECTED
+			else:
+				text, tag = MARK_UNSELECTED, TAG_UNSELECTED
+			self._tree_view.insert('', 'end', text = text, values = values, tags = [tag])
 
 	def _treeview_on_clicked(self, event):
 		x, y, widget = event.x, event.y, event.widget
-		col = self._tree_view.identify_column(x)
-		row = self._tree_view.identify_row(y) # if row is empty, then the column header is clicked.
-		if col == COL_SELECTED and row: # if clicked on the first column and on the list item.
-			item = self._tree_view.identify_row(y)
-			unselected = self._tree_view.tag_has(TAG_UNSELECTED, item)
+		col_id = self._tree_view.identify_column(x)
+		row_id = self._tree_view.identify_row(y) # if row is empty, then the column header is clicked.
+		if col_id == COL_SELECTED and row_id: # if clicked on the first column and on the list item.
+			unselected = self._tree_view.tag_has(TAG_UNSELECTED, row_id)
 			if unselected:
-				self._select_file(item)
+				self._select_file(row_id)
 			else:
-				self._unselect_file(item)
+				self._unselect_file(row_id)
 
 			if self._item_clicked_callback:
-				self._item_clicked_callback(unselected, self._tree_view.item(item, option = 'values'))
+				self._item_clicked_callback(unselected, self._tree_view.index(row_id))
 
-	def _treeview_sort_column(self, col, reverse):
-		# get all the cell values on the specific column
-		if col == COL_SELECTED:
-			l = [(self._tree_view.tag_has(TAG_SELECTED, k), k) for k in self._tree_view.get_children()]
-		else:
-			l = [(self._tree_view.set(k, col), k) for k in self._tree_view.get_children()]
-
-		# sort the cell values
-		l.sort(reverse = reverse)
-
-		# rearrange items in sorted positions
-		for index, (val, k) in enumerate(l):
-			self._tree_view.move(k, '', index)
-
-		# reset all column headers
-		self._init_column_headers()
-
-		# get new column header label
-		col_label = ''
-		if col == COL_SELECTED:
-			col_label = COL_SELECTED_TITLE
-		elif col == COL_NAME:
-			col_label = COL_NAME_TITLE
-		elif col == COL_RENAME:
-			col_label = COL_RENAME_TITLE
-		elif col == COL_TYPE:
-			col_label = COL_TYPE_TITLE
-		elif col == COL_FOLDER:
-			col_label = COL_FOLDER_TITLE
-
-		col_label += ' ↓' if reverse else ' ↑'
-
-		# reverse sort next time
-		self._tree_view.heading(col, text = col_label, command = lambda col = col, reverse = reverse: self._treeview_sort_column(col, not reverse))
+	def _treeview_sort_column(self, col):
+		if self._header_clicked_callback:
+			self._header_clicked_callback(col)
 
 	def _select_file(self, row_id):
 		self._tree_view.item(row_id, text = MARK_SELECTED, tags = [TAG_SELECTED])
 
 	def _unselect_file(self, row_id):
 		self._tree_view.item(row_id, text = MARK_UNSELECTED, tags = [TAG_UNSELECTED])
-
-	def select_files(self, files):
-		for k in self._tree_view.get_children():
-			name, new_name, ext, root = self._tree_view.item(k, option = 'values')
-			for info in files:
-				if info.basename() == name and info.path() == root:
-					self._select_file(k)
-					break
-
-	def unselect_files(self, files):
-		for k in self._tree_view.get_children():
-			name, new_name, ext, root = self._tree_view.item(k, option = 'values')
-			for info in files:
-				if info.basename() == name and info.path() == root:
-					self._unselect_file(k)
-					break
 
 SUPPORTED_SUFFIX = [
 	'.3fr', '.3g2', '.3gp', '.3gp2', '.3gpp',
@@ -333,21 +312,29 @@ class TimestampInfo():
 		return self._timestamp
 
 class FileInfo():
-	def __init__(self, basename = '', path = '', timestamps = []):
-		self._basename = basename
-		self._new_name = ''
+	def __init__(self, fname = '', ext = '', path = '', timestamps = []):
+		self._fname = fname
+		self._new_fname = ''
+		self._ext = ext
 		self._path = path
+		self._abs_path = os.path.join(path, fname)
 		self._timestamps = timestamps
 		self._selected = True
 
-	def basename(self):
-		return self._basename
+	def fname(self):
+		return self._fname
 
-	def new_name(self):
-		return self._new_name
+	def new_fname(self):
+		return self._new_fname
+
+	def ext(self):
+		return self._ext
 
 	def path(self):
 		return self._path
+
+	def abs_path(self):
+		return self._abs_path
 
 	def timestamps(self):
 		return self._timestamps
@@ -364,13 +351,12 @@ class FileInfo():
 	def set_timestamps(self, timestamps):
 		self._timestamps.clear()
 		self._timestamps.extend(timestamps)
-		self._gen_new_name()
+		self._gen_new_fname()
 
-	def _gen_new_name(self):
+	def _gen_new_fname(self):
 		if self._timestamps:
 			ts = self._timestamps[0].timestamp().strftime('%Y%m%d_%H%M%S')
-			_base, ext = os.path.splitext(self._basename)
-			self._new_name = ts + ext.lower()
+			self._new_fname = ts + self._ext
 
 class RenameApp(Frame):
 	def __init__(self):
@@ -380,7 +366,10 @@ class RenameApp(Frame):
 
 		super(RenameApp, self).__init__(self._root)
 
-		self._found_files = {}
+		self._found_files = []
+		self._files_sort_col = None
+		self._files_sort_asc = False
+
 		self._status_msg = StringVar(value = 'ready.')
 
 		self._createWidgets()
@@ -398,7 +387,7 @@ class RenameApp(Frame):
 	def _createWidgets(self):
 		self._config_panel = ConfigPanel(self)
 		self._filter_panel = FilterPanel(self, self._scan_photos, self._preview_renaming, self._do_rename, self._on_ext_selected)
-		self._preview_panel = PreviewPanel(self, self._on_file_selected)
+		self._preview_panel = PreviewPanel(self, self._on_file_selected, self._on_header_clicked)
 		self._status_bar = Label(self, textvariable = self._status_msg, borderwidth = 1, relief = 'solid')
 
 		self._config_panel.grid(column = 0, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
@@ -426,9 +415,8 @@ class RenameApp(Frame):
 				_base, ext = os.path.splitext(name)
 				ext = ext.lower()
 				if ext in SUPPORTED_SUFFIX:
-					if ext not in self._found_files:
-						self._found_files[ext] = []
-					self._found_files[ext].append(FileInfo(name, root))
+					self._found_files.append(FileInfo(name, ext, root))
+		self._sort_files()
 
 		self._status_msg.set('Fetching timestamps of all supported files under %s ...' % (photo_folder))
 		cmds = EXIF_CMD_ARGS % (exif_path, photo_folder)
@@ -437,6 +425,24 @@ class RenameApp(Frame):
 
 		self._filter_panel.disable()
 		self._root.after(100, self._check_timestamp_thread)
+
+	def _sort_files(self):
+		if not self._files_sort_col:
+			return
+
+		key = None
+		if self._files_sort_col == COL_SELECTED:
+			key = lambda x: (x.selected(), x.abs_path())
+		elif self._files_sort_col == COL_NAME:
+			key = lambda x: (x.fname(), x.path())
+		elif self._files_sort_col == COL_RENAME:
+			key = lambda x: (x.new_fname(), x.abs_path())
+		elif self._files_sort_col == COL_TYPE:
+			key = lambda x: (x.ext(), x.abs_path())
+		elif self._files_sort_col == COL_FOLDER:
+			key = lambda x: x.abs_path()
+
+		self._found_files.sort(key = key, reverse = self._files_sort_asc)
 
 	# TODO: merge this method to lambda
 	def _get_timestamps(self, cmds):
@@ -458,31 +464,10 @@ class RenameApp(Frame):
 			timestamps = self._parse_timestamps()
 			self._assign_timestamps(timestamps)
 
-			found_count = 0
-			ext_infos = []
-			for ext in self._found_files.keys():
-				cnt = len(self._found_files[ext])
-				found_count += cnt
-
-				select_count = unselect_count = 0
-				for info in self._found_files[ext]:
-					if info.selected():
-						select_count += 1
-					else:
-						unselect_count += 1
-
-				chk_btn_state = ''
-				if select_count == 0:
-					chk_btn_state = False
-				elif unselect_count == 0:
-					chk_btn_state = True
-
-				ext_infos.append((ext, cnt, chk_btn_state))
-
-			self._filter_panel.show_extensions(ext_infos)
+			self._filter_panel.show_extensions(self._found_files)
 			self._filter_panel.enable()
-			self._preview_panel.show_files(self._found_files)
-			self._status_msg.set('Done, found %d files!' % (found_count))
+			self._preview_panel.show_files(self._found_files, self._files_sort_col, self._files_sort_asc)
+			self._status_msg.set('Done, found %d files!' % (len(self._found_files)))
 
 	def _parse_timestamps(self):
 		fp = codecs.open(FILES_TIMESTAMPS, 'r')
@@ -507,14 +492,10 @@ class RenameApp(Frame):
 		return file_timestamps
 
 	def _assign_timestamps(self, timestamps):
-		for fpath in timestamps:
-			path, fname = os.path.split(fpath)
-			_base, ext = os.path.splitext(fname)
-			ext = ext.lower()
-			if ext in self._found_files:
-				for finfo in self._found_files[ext]:
-					if finfo.basename() == fname and finfo.path() == path:
-						finfo.set_timestamps(timestamps[fpath])
+		for finfo in self._found_files:
+			fpath = finfo.abs_path()
+			if finfo.abs_path() in timestamps:
+				finfo.set_timestamps(timestamps[fpath])
 
 	def _parse_timestamp(self, text):
 		tag, value = [part.strip() for part in text.split(':', 1)]
@@ -578,45 +559,35 @@ class RenameApp(Frame):
 			if not timestamps[key] or info != timestamps[key][-1]:
 				timestamps[key].append(info)
 
-	def _on_file_selected(self, selected, values):
-		name, new_name, ext, root = values
-		if ext not in self._found_files:
+	def _on_file_selected(self, selected, item_idx):
+		if item_idx < 0 or item_idx >= len(self._found_files):
+			print('wrong index of clicked row:', item_idx)
 			return
 
-		select_count = unselect_count = 0
+		info = self._found_files[item_idx]
+		if selected:
+			info.select()
+		else:
+			info.unselect()
+		self._filter_panel.show_extensions(self._found_files)
 
-		for info in self._found_files[ext]:
-			if info.basename() == name and info.path() == root:
+	def _on_header_clicked(self, col):
+		if not self._files_sort_col:
+			self._files_sort_asc = True
+		else:
+			self._files_sort_asc = not self._files_sort_asc
+		self._files_sort_col = col
+		self._sort_files()
+		self._preview_panel.show_files(self._found_files, self._files_sort_col, self._files_sort_asc)
+
+	def _on_ext_selected(self, ext, selected):
+		for info in self._found_files:
+			if info.ext() == ext:
 				if selected:
 					info.select()
 				else:
 					info.unselect()
-			if info.selected():
-				select_count += 1
-			else:
-				unselect_count += 1
-
-		if select_count == 0:
-			self._filter_panel.update_ext_selection(ext, False)
-		elif unselect_count == 0:
-			self._filter_panel.update_ext_selection(ext, True)
-		else:
-			self._filter_panel.update_ext_selection(ext, '')
-
-	def _on_ext_selected(self, ext, selected):
-		if ext not in self._found_files:
-			return
-
-		if selected:
-			self._preview_panel.select_files(self._found_files[ext])
-		else:
-			self._preview_panel.unselect_files(self._found_files[ext])
-
-		for info in self._found_files[ext]:
-			if selected:
-				info.select()
-			else:
-				info.unselect()
+		self._preview_panel.show_files(self._found_files, self._files_sort_col, self._files_sort_asc)
 
 	def _preview_renaming(self):
 		pass
