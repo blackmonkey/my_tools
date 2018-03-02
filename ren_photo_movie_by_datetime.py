@@ -154,15 +154,15 @@ class FilterPanel(Frame):
 						childd.config(state = NORMAL)
 
 COL_SELECTED = '#0'
-COL_NAME = 'Name'
-COL_RENAME = 'Rename'
-COL_TYPE = 'Type'
-COL_FOLDER = 'Path'
+COL_NAME = '#1'
+COL_RENAME = '#2'
+COL_TYPE = '#3'
+COL_FOLDER = '#4'
 COL_SELECTED_TITLE = 'Selected'
-COL_NAME_TITLE = COL_NAME
-COL_RENAME_TITLE = COL_RENAME
-COL_TYPE_TITLE = COL_TYPE
-COL_FOLDER_TITLE = COL_FOLDER
+COL_NAME_TITLE = 'Name'
+COL_RENAME_TITLE = 'Rename'
+COL_TYPE_TITLE = 'Type'
+COL_FOLDER_TITLE = 'Path'
 
 MARK_SELECTED = '☑'
 MARK_UNSELECTED = '☐'
@@ -171,10 +171,11 @@ TAG_SELECTED = 'selected'
 TAG_UNSELECTED = 'unselected'
 
 class PreviewPanel(Frame):
-	def __init__(self, parent, item_callback, header_callback):
+	def __init__(self, parent, item_selected_callback, timestamp_callback, header_callback):
 		super(PreviewPanel, self).__init__(parent)
 
-		self._item_clicked_callback = item_callback
+		self._item_selected_callback = item_selected_callback
+		self._timestamp_callback = timestamp_callback
 		self._header_clicked_callback = header_callback
 
 		self._tree_view = Treeview(self, columns = (COL_NAME, COL_RENAME, COL_TYPE, COL_FOLDER))
@@ -241,15 +242,19 @@ class PreviewPanel(Frame):
 		x, y, widget = event.x, event.y, event.widget
 		col_id = self._tree_view.identify_column(x)
 		row_id = self._tree_view.identify_row(y) # if row is empty, then the column header is clicked.
-		if col_id == COL_SELECTED and row_id: # if clicked on the first column and on the list item.
-			unselected = self._tree_view.tag_has(TAG_UNSELECTED, row_id)
-			if unselected:
-				self._select_file(row_id)
-			else:
-				self._unselect_file(row_id)
+		if row_id:
+			if col_id == COL_SELECTED: # if clicked on the first column and on the list item.
+				unselected = self._tree_view.tag_has(TAG_UNSELECTED, row_id)
+				if unselected:
+					self._select_file(row_id)
+				else:
+					self._unselect_file(row_id)
 
-			if self._item_clicked_callback:
-				self._item_clicked_callback(unselected, self._tree_view.index(row_id))
+				if self._item_selected_callback:
+					self._item_selected_callback(unselected, self._tree_view.index(row_id))
+			elif col_id == COL_RENAME and self._timestamp_callback:
+				self._tree_view.selection_set(row_id)
+				self._timestamp_callback(self._tree_view.index(row_id), event.x_root, event.y_root)
 
 	def _treeview_sort_column(self, col):
 		if self._header_clicked_callback:
@@ -312,13 +317,13 @@ class TimestampInfo():
 		return self._timestamp
 
 class FileInfo():
-	def __init__(self, fname = '', ext = '', path = '', timestamps = []):
+	def __init__(self, fname = '', ext = '', path = ''):
 		self._fname = fname
 		self._new_fname = ''
 		self._ext = ext
 		self._path = path
 		self._abs_path = os.path.join(path, fname)
-		self._timestamps = timestamps
+		self._timestamps = []
 		self._selected = True
 
 	def fname(self):
@@ -349,6 +354,10 @@ class FileInfo():
 		self._selected = False
 
 	def set_timestamps(self, timestamps):
+		# print('-' * 80)
+		# print(self._abs_path)
+		# print(self._timestamps)
+		# pprint(timestamps)
 		self._timestamps.clear()
 		self._timestamps.extend(timestamps)
 		self._gen_new_fname()
@@ -357,6 +366,33 @@ class FileInfo():
 		if self._timestamps:
 			ts = self._timestamps[0].timestamp().strftime('%Y%m%d_%H%M%S')
 			self._new_fname = ts + self._ext
+
+	def set_new_fname(self, new_ts):
+		self._new_fname = new_ts + self._ext
+
+class TimestampList(Menu):
+	def __init__(self, root, cur_ts, timestamps, callback):
+		super(TimestampList, self).__init__(root, tearoff = 0)
+
+		# find maximum tag length
+		max_len = max([len(ts.tag()) for ts in timestamps])
+		for i, ts in enumerate(timestamps):
+			if ts.timestamp().microsecond != 0:
+				ts_str = ts.timestamp().strftime('%Y%m%d_%H%M%S_%f')
+			else:
+				ts_str = ts.timestamp().strftime('%Y%m%d_%H%M%S')
+
+			label = ('%' + str(max_len) + 's : %s') % (ts.tag(), ts.timestamp())
+			cmd = lambda ts = ts_str, callback = callback: callback(ts)
+
+			# initialize a individual variable for each check button, to avoid they using same one, i.e. the default one.
+			self.add_checkbutton(label = label, font = 'Consolas 8', variable = BooleanVar())
+
+			# The method invoke() will trigger the command as well as set the select mark.
+			# Therefore, set command after execute invoke().
+			if ts_str.startswith(cur_ts):
+				self.invoke(i)
+			self.entryconfigure(i, command = cmd)
 
 class RenameApp(Frame):
 	def __init__(self):
@@ -387,7 +423,7 @@ class RenameApp(Frame):
 	def _createWidgets(self):
 		self._config_panel = ConfigPanel(self)
 		self._filter_panel = FilterPanel(self, self._scan_photos, self._preview_renaming, self._do_rename, self._on_ext_selected)
-		self._preview_panel = PreviewPanel(self, self._on_file_selected, self._on_header_clicked)
+		self._preview_panel = PreviewPanel(self, self._on_file_selected, self._on_timestamp_clicked, self._on_header_clicked)
 		self._status_bar = Label(self, textvariable = self._status_msg, borderwidth = 1, relief = 'solid')
 
 		self._config_panel.grid(column = 0, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
@@ -461,6 +497,7 @@ class RenameApp(Frame):
 				return
 
 			timestamps = self._parse_timestamps()
+			# pprint(timestamps)
 			self._assign_timestamps(timestamps)
 
 			self._filter_panel.show_extensions(self._found_files)
@@ -569,6 +606,21 @@ class RenameApp(Frame):
 		else:
 			info.unselect()
 		self._filter_panel.show_extensions(self._found_files)
+
+	def _on_timestamp_clicked(self, item_idx, x, y):
+		info = self._found_files[item_idx]
+		ts, ext = os.path.splitext(info.new_fname())
+		menu = TimestampList(self._root, ts, info.timestamps(), lambda new_ts, item_idx = item_idx: self._update_file_new_name(new_ts, item_idx))
+		try:
+			menu.post(x, y)
+		finally:
+			# make sure to release the grab (Tk 8.0a1 only)
+			menu.grab_release()
+
+	def _update_file_new_name(self, new_ts, item_idx):
+		info = self._found_files[item_idx]
+		info.set_new_fname(new_ts)
+		self._preview_panel.show_files(self._found_files, self._files_sort_col, self._files_sort_asc)
 
 	def _on_header_clicked(self, col):
 		if not self._files_sort_col:
