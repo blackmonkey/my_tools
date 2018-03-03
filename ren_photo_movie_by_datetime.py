@@ -576,6 +576,7 @@ class RenameApp(Frame):
 		ts = date + (time - datetime(1970, 1, 1))
 		return self._utc0_to_local(ts)
 
+	# FIXME: The merged timestamps still contain duplicated ones
 	def _merge_timestamps(self, timestamps, key):
 		# merge GPS Date with GPS Time
 		gps_date, gps_time, full_ts = [], [], []
@@ -620,6 +621,11 @@ class RenameApp(Frame):
 	def _update_file_new_name(self, new_ts, item_idx):
 		info = self._found_files[item_idx]
 		info.set_new_fname(new_ts)
+
+		# TODO:
+		# 1. The microseconds is appended to the new name, convert it to milliseconds, or remove it if possible.
+		# 2. Append sequence number for those images with same timestamps in seconds, then show the updated files.
+
 		self._preview_panel.show_files(self._found_files, self._files_sort_col, self._files_sort_asc)
 
 	def _on_header_clicked(self, col):
@@ -641,9 +647,11 @@ class RenameApp(Frame):
 		self._preview_panel.show_files(self._found_files, self._files_sort_col, self._files_sort_asc)
 
 	def _preview_renaming(self):
+		# TODO: it seems this method is useless, remove it and the bound button.
 		pass
 
 	def _do_rename(self):
+		# TODO: implement the concrete renaming.
 		pass
 
 if __name__ == '__main__':
