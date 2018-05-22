@@ -545,7 +545,10 @@ class RenameApp(Frame):
 
 	def _parse_timestamp(self, text):
 		tag, value = [part.strip() for part in text.split(':', 1)]
-		ts, suffix = re.findall(r'^([0-9: .]+)(.*)$', value)[0]
+		res = re.findall(r'^([0-9: .]+)(.*)$', value)
+		if len(res) == 0:
+			return None
+		ts, suffix = res[0]
 		if ':' not in ts:
 			return None
 
@@ -590,7 +593,6 @@ class RenameApp(Frame):
 		ts = date + (time - datetime(1970, 1, 1))
 		return self._utc0_to_local(ts)
 
-	# FIXME: The merged timestamps still contain duplicated ones
 	def _merge_timestamps(self, timestamps, key):
 		# merge GPS Date with GPS Time
 		gps_date, gps_time, full_ts = [], [], []
@@ -604,7 +606,7 @@ class RenameApp(Frame):
 		full_ts.extend([TimestampInfo('GPS Date/Time', self._merge_local_date_time(d, t)) for d in gps_date for t in gps_time])
 
 		# return unique (tag, timestamp)
-		full_ts.sort(key = lambda x: x.timestamp())
+		full_ts.sort(key = lambda x: (x.timestamp(), x.tag()))
 		timestamps[key].clear()
 		for info in full_ts:
 			if not timestamps[key] or info != timestamps[key][-1]:
