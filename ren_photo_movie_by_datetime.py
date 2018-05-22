@@ -171,11 +171,13 @@ COL_NAME = '#1'
 COL_RENAME = '#2'
 COL_TYPE = '#3'
 COL_FOLDER = '#4'
+COL_STATUS = '#5'
 COL_SELECTED_TITLE = 'Selected'
 COL_NAME_TITLE = 'Name'
 COL_RENAME_TITLE = 'Rename'
 COL_TYPE_TITLE = 'Type'
 COL_FOLDER_TITLE = 'Path'
+COL_STATUS_TITLE = 'Status'
 
 MARK_SELECTED = '\u2611'
 MARK_UNSELECTED = '\u2610'
@@ -191,14 +193,15 @@ class PreviewPanel(Frame):
 		self._timestamp_callback = timestamp_callback
 		self._header_clicked_callback = header_callback
 
-		self._tree_view = Treeview(self, columns = (COL_NAME, COL_RENAME, COL_TYPE, COL_FOLDER))
+		self._tree_view = Treeview(self, columns = (COL_NAME, COL_RENAME, COL_TYPE, COL_FOLDER, COL_STATUS))
 		self._tree_view.tag_configure(TAG_SELECTED, foreground = 'black')
 		self._tree_view.tag_configure(TAG_UNSELECTED, foreground = 'lightgray')
 		self._tree_view.column(COL_SELECTED, width = 60, stretch = False)
 		self._tree_view.column(COL_NAME, width = 200, stretch = False, anchor = W)
 		self._tree_view.column(COL_RENAME, width = 200, stretch = False, anchor = W)
 		self._tree_view.column(COL_TYPE, width = 50, stretch = False, anchor = W)
-		self._tree_view.column(COL_FOLDER, width = 800, stretch = False, anchor = W)
+		self._tree_view.column(COL_FOLDER, width = 500, stretch = False, anchor = W)
+		self._tree_view.column(COL_STATUS, width = 300, stretch = False, anchor = W)
 		self._init_column_headers()
 
 		vbar = Scrollbar(self, orient = VERTICAL, command = self._tree_view.yview)
@@ -218,6 +221,7 @@ class PreviewPanel(Frame):
 		self._tree_view.heading(COL_RENAME, text = COL_RENAME_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_RENAME))
 		self._tree_view.heading(COL_TYPE, text = COL_TYPE_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_TYPE))
 		self._tree_view.heading(COL_FOLDER, text = COL_FOLDER_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_FOLDER))
+		self._tree_view.heading(COL_STATUS, text = COL_STATUS_TITLE, anchor = W, command = lambda: self._treeview_sort_column(COL_STATUS))
 
 	def show_files(self, files, sorted_header, asc):
 		# reset all column headers
@@ -237,6 +241,8 @@ class PreviewPanel(Frame):
 				col_label = COL_TYPE_TITLE
 			elif sorted_header == COL_FOLDER:
 				col_label = COL_FOLDER_TITLE
+			elif sorted_header == COL_STATUS:
+				col_label = COL_STATUS_TITLE
 
 			col_label += ' \u2193' if asc else ' \u2191'
 			self._tree_view.heading(sorted_header, text = col_label)
@@ -244,7 +250,7 @@ class PreviewPanel(Frame):
 		self._tree_view.delete(*self._tree_view.get_children())
 
 		for info in files:
-			values = [info.fname(), info.new_fname() + ' \u23F7', info.ext(), info.path()]
+			values = [info.fname(), info.new_fname() + ' \u23F7', info.ext(), info.path(), '' if info.duplicated_group_num() == 0 else '[%d] 重命名重复' % (info.duplicated_group_num())]
 			if info.selected():
 				text, tag = MARK_SELECTED, TAG_SELECTED
 			else:
@@ -338,6 +344,7 @@ class FileInfo():
 		self._abs_path = os.path.join(path, fname)
 		self._timestamps = []
 		self._selected = True
+		self._duplicated_group = 0
 
 	def fname(self):
 		return self._fname
@@ -382,6 +389,12 @@ class FileInfo():
 
 	def set_new_fname(self, new_ts):
 		self._new_fname = new_ts + self._ext
+
+	def duplicated_group_num(self):
+		return self._duplicated_group
+
+	def set_duplicated_group(self, group_num):
+		self._duplicated_group = group_num
 
 class TimestampList(Menu):
 	def __init__(self, root, cur_ts, timestamps, callback):
@@ -490,6 +503,8 @@ class RenameApp(Frame):
 			key = lambda x: (x.ext(), x.abs_path())
 		elif self._files_sort_col == COL_FOLDER:
 			key = lambda x: x.abs_path()
+		elif self._files_sort_col == COL_STATUS:
+			key = lambda x: x.duplicated_group_num()
 
 		self._found_files.sort(key = key, reverse = self._files_sort_asc)
 
@@ -512,6 +527,7 @@ class RenameApp(Frame):
 			timestamps = self._parse_timestamps()
 			# pprint(timestamps)
 			self._assign_timestamps(timestamps)
+			self._check_duplicated_renames()
 
 			self._filter_panel.show_extensions(self._found_files)
 			self._filter_panel.enable()
@@ -542,6 +558,20 @@ class RenameApp(Frame):
 			fpath = finfo.abs_path()
 			if finfo.abs_path() in timestamps:
 				finfo.set_timestamps(timestamps[fpath])
+
+	def _check_duplicated_renames(self):
+		renames = {}
+		for finfo in self._found_files:
+			abs_new_fname = os.path.join(finfo.path(), finfo.new_fname())
+			if abs_new_fname not in renames:
+				renames[abs_new_fname] = []
+			renames[abs_new_fname].append(finfo)
+		i = 1
+		for new_name in renames:
+			if len(renames[new_name]) > 1:
+				for finfo in renames[new_name]:
+					finfo.set_duplicated_group(i)
+				i += 1
 
 	def _parse_timestamp(self, text):
 		tag, value = [part.strip() for part in text.split(':', 1)]
