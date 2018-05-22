@@ -177,8 +177,8 @@ COL_RENAME_TITLE = 'Rename'
 COL_TYPE_TITLE = 'Type'
 COL_FOLDER_TITLE = 'Path'
 
-MARK_SELECTED = '☑'
-MARK_UNSELECTED = '☐'
+MARK_SELECTED = '\u2611'
+MARK_UNSELECTED = '\u2610'
 
 TAG_SELECTED = 'selected'
 TAG_UNSELECTED = 'unselected'
@@ -238,13 +238,13 @@ class PreviewPanel(Frame):
 			elif sorted_header == COL_FOLDER:
 				col_label = COL_FOLDER_TITLE
 
-			col_label += ' ↓' if asc else ' ↑'
+			col_label += ' \u2193' if asc else ' \u2191'
 			self._tree_view.heading(sorted_header, text = col_label)
 
 		self._tree_view.delete(*self._tree_view.get_children())
 
 		for info in files:
-			values = [info.fname(), info.new_fname(), info.ext(), info.path()]
+			values = [info.fname(), info.new_fname() + ' \u23F7', info.ext(), info.path()]
 			if info.selected():
 				text, tag = MARK_SELECTED, TAG_SELECTED
 			else:
