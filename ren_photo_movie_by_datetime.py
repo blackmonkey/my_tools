@@ -68,7 +68,7 @@ def cmp_ext_button(first_btn, second_btn):
 		return 1
 
 class FilterPanel(Frame):
-	def __init__(self, parent, scan_fun, preview_fun, rename_run, callback):
+	def __init__(self, parent, scan_fun, rename_run, callback):
 		super(FilterPanel, self).__init__(parent)
 
 		self._checkbutton_changed_callback = callback
@@ -77,9 +77,8 @@ class FilterPanel(Frame):
 		self._filters_panel.grid(column = 0, row = 0, rowspan = 2, sticky = NSEW, padx = PAD, pady = PAD)
 		self._filters_panel.bind('<Configure>', self._on_filter_panel_configure)
 
-		Button(self, text = 'Scan', command = scan_fun).grid(column = 2, row = 0, columnspan = 2, sticky = NSEW, padx = PAD, pady = PAD)
-		Button(self, text = 'Preview', command = preview_fun).grid(column = 2, row = 1, sticky = NSEW, padx = PAD, pady = PAD)
-		Button(self, text = 'Rename', command = rename_run).grid(column = 3, row = 1, sticky = NSEW, padx = PAD, pady = PAD)
+		Button(self, text = 'Scan', command = scan_fun).grid(column = 2, row = 0, sticky = NSEW, padx = PAD, pady = PAD)
+		Button(self, text = 'Rename', command = rename_run).grid(column = 2, row = 1, sticky = NSEW, padx = PAD, pady = PAD)
 
 		self.grid_columnconfigure(0, weight = 1)
 
@@ -422,7 +421,7 @@ class RenameApp(Frame):
 
 	def _createWidgets(self):
 		self._config_panel = ConfigPanel(self)
-		self._filter_panel = FilterPanel(self, self._scan_photos, self._preview_renaming, self._do_rename, self._on_ext_selected)
+		self._filter_panel = FilterPanel(self, self._scan_photos, self._do_rename, self._on_ext_selected)
 		self._preview_panel = PreviewPanel(self, self._on_file_selected, self._on_timestamp_clicked, self._on_header_clicked)
 		self._status_bar = Label(self, textvariable = self._status_msg, borderwidth = 1, relief = 'solid')
 
@@ -645,10 +644,6 @@ class RenameApp(Frame):
 				else:
 					info.unselect()
 		self._preview_panel.show_files(self._found_files, self._files_sort_col, self._files_sort_asc)
-
-	def _preview_renaming(self):
-		# TODO: it seems this method is useless, remove it and the bound button.
-		pass
 
 	def _do_rename(self):
 		# TODO: implement the concrete renaming.
