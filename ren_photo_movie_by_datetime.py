@@ -10,6 +10,20 @@ import tkinter.messagebox as tmsgbox
 
 PAD = 2.5
 EXIF_CMD = 'exiftool.exe'
+ENCODINGS = ['utf8', 'gb2312', 'gb18030', 'ascii']
+
+def read_file_lines(fname):
+	for encoding in ENCODINGS:
+		try:
+			fp = codecs.open(fname, 'r', encoding)
+			lines = fp.readlines()
+			fp.close()
+			print('load %s in %s encoding.' % (fname, encoding))
+			return lines
+		except UnicodeDecodeError:
+			print('failed to load %s in %s encoding.' % (fname, encoding))
+			pass
+	return []
 
 class ConfigPanel(Frame):
 	def __init__(self, parent):
@@ -505,10 +519,7 @@ class RenameApp(Frame):
 			self._status_msg.set('Done, found %d files!' % (len(self._found_files)))
 
 	def _parse_timestamps(self):
-		fp = codecs.open(FILES_TIMESTAMPS, 'r')
-		lines = fp.readlines()
-		fp.close()
-
+		lines = read_file_lines(FILES_TIMESTAMPS)
 		file_timestamps = {}
 		last_fpath = None
 		for l in lines:
@@ -541,6 +552,7 @@ class RenameApp(Frame):
 		is_utc0 = True if (suffix and suffix[0] == 'Z') or tag.startswith('GPS ') else False
 
 		parts = re.split(r'[ :.]', ts)
+		print('parsing', text, '->', parts)
 		if len(parts) == 7:
 			# valid date time
 			pass
@@ -557,7 +569,10 @@ class RenameApp(Frame):
 			return None
 
 		ts = [int(s) for s in parts]
-		ts = datetime(ts[0], ts[1], ts[2], ts[3], ts[4], ts[5], ts[6] * 1000)
+		if len(ts) > 6:
+			ts = datetime(ts[0], ts[1], ts[2], ts[3], ts[4], ts[5], ts[6] * 1000)
+		else:
+			ts = datetime(ts[0], ts[1], ts[2], ts[3], ts[4], ts[5])
 		if is_utc0:
 			ts = self._utc0_to_local(ts)
 
