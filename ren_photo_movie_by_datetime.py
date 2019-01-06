@@ -420,6 +420,12 @@ class TimestampList(Menu):
 				self.invoke(i)
 			self.entryconfigure(i, command = cmd)
 
+DO_REAL_SCAN = False
+DATE_PAT = re.compile('^([0-9]{4}):([0-9]{1,2}):([0-9]{1,2})$')
+HOUR_MIN_PAT = re.compile('^([0-9]{1,2}:[0-9]{1,2})(.*)$')
+SECOND_PAT = re.compile('^([0-9]{1,2})(?:\.([0-9]+))?(.*)$')
+TIMEZONE_PAT = re.compile('^([0-9]{1,2}:[0-9]{1,2})')
+
 class RenameApp(Frame):
 	def __init__(self):
 		self._root = Tk()
@@ -429,6 +435,7 @@ class RenameApp(Frame):
 		super(RenameApp, self).__init__(self._root)
 
 		self._found_files = []
+		self._timestamp_thread = None
 		self._files_sort_col = None
 		self._files_sort_asc = False
 
@@ -460,30 +467,31 @@ class RenameApp(Frame):
 		self._status_bar.grid(column = 0, row = 5, sticky = NSEW, padx = PAD, pady = PAD)
 
 	def _scan_photos(self):
-		exif_path = self._config_panel.get_exif_path()
-		if not exif_path or not os.path.isfile(exif_path):
-			tmsgbox.showwarning('Oops', 'Please specify exif tool at first!')
-			return
+		if DO_REAL_SCAN:
+			exif_path = self._config_panel.get_exif_path()
+			if not exif_path or not os.path.isfile(exif_path):
+				tmsgbox.showwarning('Oops', 'Please specify exif tool at first!')
+				return
 
-		photo_folder = self._config_panel.get_photo_path()
-		if not photo_folder:
-			tmsgbox.showwarning('Oops', 'Please specify the photo folder at first!')
-			return
+			photo_folder = self._config_panel.get_photo_path()
+			if not photo_folder:
+				tmsgbox.showwarning('Oops', 'Please specify the photo folder at first!')
+				return
 
-		self._found_files.clear()
-		for root, dirs, files in os.walk(photo_folder):
-			self._status_msg.set('scanning ' + root)
-			for name in files:
-				_base, ext = os.path.splitext(name)
-				ext = ext.lower()
-				if ext in SUPPORTED_SUFFIX:
-					self._found_files.append(FileInfo(name, ext, root))
-		self._sort_files()
+			self._found_files.clear()
+			for root, dirs, files in os.walk(photo_folder):
+				self._status_msg.set('scanning ' + root)
+				for name in files:
+					_base, ext = os.path.splitext(name)
+					ext = ext.lower()
+					if ext in SUPPORTED_SUFFIX:
+						self._found_files.append(FileInfo(name, ext, root))
+			self._sort_files()
 
-		self._status_msg.set('Fetching timestamps of all supported files under %s ...' % (photo_folder))
-		cmds = EXIF_CMD_ARGS % (exif_path, photo_folder)
-		self._timestamp_thread = threading.Thread(target = self._get_timestamps, kwargs = {'cmds' : cmds})
-		self._timestamp_thread.start()
+			self._status_msg.set('Fetching timestamps of all supported files under %s ...' % (photo_folder))
+			cmds = EXIF_CMD_ARGS % (exif_path, photo_folder)
+			self._timestamp_thread = threading.Thread(target = self._get_timestamps, kwargs = {'cmds' : cmds})
+			self._timestamp_thread.start()
 
 		self._filter_panel.disable()
 		self._root.after(100, self._check_timestamp_thread)
@@ -512,7 +520,7 @@ class RenameApp(Frame):
 		subprocess.call(cmds, shell = True)
 
 	def _check_timestamp_thread(self):
-		if self._timestamp_thread.is_alive():
+		if self._timestamp_thread and self._timestamp_thread.is_alive():
 			self._root.after(100, self._check_timestamp_thread)
 		else:
 			size = 0
@@ -525,7 +533,14 @@ class RenameApp(Frame):
 				return
 
 			timestamps = self._parse_timestamps()
-			# pprint(timestamps)
+
+			if not DO_REAL_SCAN:
+				for fpath in timestamps.keys():
+					base, ext = os.path.splitext(fpath)
+					root, name = os.path.split(base)
+					self._found_files.append(FileInfo(name + ext, ext, root))
+				self._sort_files()
+
 			self._assign_timestamps(timestamps)
 			self._check_duplicated_renames()
 
@@ -537,21 +552,150 @@ class RenameApp(Frame):
 	def _parse_timestamps(self):
 		lines = read_file_lines(FILES_TIMESTAMPS)
 		file_timestamps = {}
-		last_fpath = None
+		fpath = None
 		for l in lines:
-			if l.startswith(' '):
+			l = l.strip()
+			if l.endswith(' directories scanned') or l.endswith(' image files read'):
 				continue
 			elif l.startswith('======== '):
-				if last_fpath:
-					self._merge_timestamps(file_timestamps, last_fpath)
-				last_fpath = l[9:].strip().replace('/', os.path.sep)
-				file_timestamps[last_fpath] = []
+				if fpath:
+					self._merge_timestamps(file_timestamps, fpath)
+				fpath = l[9:].strip().replace('/', os.path.sep)
+				file_timestamps[fpath] = []
 			else:
-				info = self._parse_timestamp(l.strip())
-				if info:
-					file_timestamps[last_fpath].append(info)
-		self._merge_timestamps(file_timestamps, last_fpath)
+				for ts, valid in self._parse_tag_timestamps(l):
+					if ts is not None and valid:
+						file_timestamps[fpath].append(ts)
+		self._merge_timestamps(file_timestamps, fpath)
 		return file_timestamps
+
+	def _parse_tag_timestamps(self, tag_ts_text):
+		try:
+			tag, ts_values = [part.strip() for part in tag_ts_text.split(':', 1)]
+		except ValueError:
+			# tag_ts_text doesn't contain (tag, value) pair
+			return [(None, False)]
+
+		# it is possible that the tag value contains multiple timestamps separated by comma.
+		return [self._parse_timestamp(tag, part.strip()) for part in ts_values.strip().split(',')]
+
+	def _parse_timestamp(self, tag, ts_text):
+		date, time, valid_date, valid_time = None, None, False, False
+		if ' ' in ts_text:
+			date_text, time_text = ts_text.split()
+			date, valid_date = self._parse_date(date_text)
+			time, valid_time = self._parse_time(time_text)
+		else:
+			# try parse ts_text as date at first
+			date, valid_date = self._parse_date(ts_text)
+			if not valid_date:
+				# then parse ts_text as time
+				time, valid_time = self._parse_time(ts_text)
+
+		if not valid_date and not valid_time:
+			return (ts_text, False)
+
+		year, month, day = (date if valid_date else [0, 0, 0])
+		if year < 1970:
+			year = 1970
+		if month < 1:
+			month = 1
+		if day < 1:
+			day = 1
+		hour, minute, second, millisecond, timezone = (time if valid_time else [0, 0, 0, 0, None])
+		if tag.startswith('GPS '): # adjust UTC0 timezone
+			timezone = 0.0
+
+		# TODO: handle timezone
+		#	if is_utc0:
+		#		ts = utc0_to_local(ts)
+#		if timezone is not None:
+#			timezone = datetime.timezone(datetime.timedelta(-1, 68400))
+
+		try:
+#			ts = datetime(year, month, day, hour, minute, second, millisecond * 1000, timezone)
+			ts = datetime(year, month, day, hour, minute, second, millisecond * 1000)
+			return (TimestampInfo(tag, ts), True)
+		except ValueError:
+			return (ts_text, False)
+
+	def _parse_date(self, date_text):
+		'''The date must match regex ^[0-9]{4}:[0-9]{1,2}:[0-9]{1,2}$
+		return ([year, month, day], True/False)
+		'''
+		try:
+			res = DATE_PAT.findall(date_text)
+			if len(res) == 0:
+				return (None, False)
+			return ([int(s) for s in res[0]], True)
+		except:
+			return (None, False)
+
+	def _parse_time(self, time_text):
+		'''The time must match regex ^[0-9]{1,2}:[0-9]{1,2}(?::[0-9]{1,2})?(?:\.[0-9]+)?(?:[+-][0-9]{1,2}:[0-9]{1,2})?(?:[Z上下午]+)?$
+		return ([hour, minute, second, millisecond, timezone], True/False)
+		'''
+		hour, minute, second, millisecond, timezone = default_res = [0, 0, 0, 0, None]
+
+		try:
+			# parse the hour and minute
+			res = HOUR_MIN_PAT.findall(time_text)
+			if len(res) == 0:
+				return (default_res, False)
+			hour_min_text, time_text = res[0]
+			hour, minute = [int(s) for s in hour_min_text.split(':')]
+
+			# to here there are five possible formats of remaining text:
+			# 1. :second(.millisecond)...
+			# 2. [+/-]timezone...
+			# 3. Z...
+			# 4. 上/下午...
+			# 5. $
+			if len(time_text) == 0 or time_text.startswith('上午') or time_text.startswith('下午'):
+				return ([hour, minute, second, millisecond, timezone], True)
+			if time_text.startswith('Z'):
+				return ([hour, minute, second, millisecond, 0.0], True)
+			if time_text.startswith('+') or time_text.startswith('-'):
+				timezone, valid = self._parse_timezone(time_text[1:])
+				return ([hour, minute, second, millisecond, timezone if valid else None], True)
+
+			# to here, time_text must start with ':'
+			if not time_text.startswith(':'):
+				return (default_res, False)
+			res = SECOND_PAT.findall(time_text[1:])
+			if len(res) == 0:
+				return (default_res, False)
+			second_text, millisecond_text, time_text = res[0]
+			second = int(second_text)
+			if len(millisecond_text) > 0:
+				millisecond = int(millisecond_text)
+
+			# to here there are four possible formats of remaining text:
+			# 1. [+/-]timezone...
+			# 2. Z...
+			# 3. 上/下午...
+			# 4. $
+			if len(time_text) == 0 or time_text.startswith('上午') or time_text.startswith('下午'):
+				return ([hour, minute, second, millisecond, timezone], True)
+			if time_text.startswith('Z'):
+				return ([hour, minute, second, millisecond, 0.0], True)
+			if time_text.startswith('+') or time_text.startswith('-'):
+				timezone, valid = self._parse_timezone(time_text[1:])
+				return ([hour, minute, second, millisecond, timezone if valid else None], True)
+
+			# to here, the remaining text contains unknown information.
+			return ([hour, minute, second, millisecond, timezone], False)
+		except:
+			return (default_res, False)
+
+	def _parse_timezone(self, timezone_text):
+		try:
+			res = TIMEZONE_PAT.findall(timezone_text)
+			if len(res) == 0:
+				return (None, False)
+			return (float(res[0].replace(':', '.')), True)
+		except:
+			return (None, False)
 
 	def _assign_timestamps(self, timestamps):
 		for finfo in self._found_files:
@@ -573,44 +717,6 @@ class RenameApp(Frame):
 					finfo.set_duplicated_group(i)
 				i += 1
 
-	def _parse_timestamp(self, text):
-		tag, value = [part.strip() for part in text.split(':', 1)]
-		res = re.findall(r'^([0-9: .]+)(.*)$', value)
-		if len(res) == 0:
-			return None
-		ts, suffix = res[0]
-		if ':' not in ts:
-			return None
-
-		is_utc0 = True if (suffix and suffix[0] == 'Z') or tag.startswith('GPS ') else False
-
-		parts = re.split(r'[ :.]', ts)
-		print('parsing', text, '->', parts)
-		if len(parts) == 7:
-			# valid date time
-			pass
-		elif len(parts) == 6:
-			parts.append('0')
-		elif len(parts) == 3 and len(parts[0]) == 4:
-			# it is a date, append 0 time
-			parts.extend(['0', '0', '0', '0'])
-		elif len(parts) in [3, 4] and len(parts[0]) == 2:
-			# it is a time, insert 0 date
-			parts = ['1970', '1', '1'] + parts
-		else:
-			print('invalid ts:', text, '->', parts)
-			return None
-
-		ts = [int(s) for s in parts]
-		if len(ts) > 6:
-			ts = datetime(ts[0], ts[1], ts[2], ts[3], ts[4], ts[5], ts[6] * 1000)
-		else:
-			ts = datetime(ts[0], ts[1], ts[2], ts[3], ts[4], ts[5])
-		if is_utc0:
-			ts = self._utc0_to_local(ts)
-
-		return TimestampInfo(tag, ts)
-
 	def _utc0_to_local(self, ts):
 		return ts + (datetime.now() - datetime.utcnow())
 
@@ -626,21 +732,21 @@ class RenameApp(Frame):
 	def _merge_timestamps(self, timestamps, key):
 		# merge GPS Date with GPS Time
 		gps_date, gps_time, full_ts = [], [], []
-		for info in timestamps[key]:
-			if info.tag() == 'GPS Date Stamp':
-				gps_date.append(info.timestamp())
-			elif info.tag() == 'GPS Time Stamp':
-				gps_time.append(info.timestamp())
+		for ts in timestamps[key]:
+			if ts.tag() == 'GPS Date Stamp':
+				gps_date.append(ts.timestamp())
+			elif ts.tag() == 'GPS Time Stamp':
+				gps_time.append(ts.timestamp())
 			else:
-				full_ts.append(info)
+				full_ts.append(ts)
 		full_ts.extend([TimestampInfo('GPS Date/Time', self._merge_local_date_time(d, t)) for d in gps_date for t in gps_time])
 
 		# return unique (tag, timestamp)
 		full_ts.sort(key = lambda x: (x.timestamp(), x.tag()))
 		timestamps[key].clear()
-		for info in full_ts:
-			if not timestamps[key] or info != timestamps[key][-1]:
-				timestamps[key].append(info)
+		for ts in full_ts:
+			if not timestamps[key] or ts != timestamps[key][-1]:
+				timestamps[key].append(ts)
 
 	def _on_file_selected(self, selected, item_idx):
 		if item_idx < 0 or item_idx >= len(self._found_files):
