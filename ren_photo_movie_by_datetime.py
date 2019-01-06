@@ -8,6 +8,12 @@ from idlelib.tooltip import ToolTip
 from pprint import pprint
 import tkinter.messagebox as tmsgbox
 
+"""
+The features planned to implement via this script have be found in Advanced Renamer.
+Therefore, this script will be deprecated.
+See Advanced Renamer: https://www.advancedrenamer.com/ 
+"""
+
 PAD = 2.5
 EXIF_CMD = 'exiftool.exe'
 ENCODINGS = ['utf8', 'gb2312', 'gb18030', 'ascii']
