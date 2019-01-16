@@ -2,6 +2,7 @@
 import codecs, requests, sys, re, functools, urllib, pprint, os, time
 from urllib.parse import urljoin
 from bookmarks import BOOKMARKS
+from timeit import default_timer as timer
 
 def tr(tag, msg):
 	sys.stdout.write('[%s] %s\n' % (tag, msg))
@@ -230,18 +231,24 @@ def download_novel(novelName, contentLink, bookmarkLink):
 		return bookmarkLink
 	return content_links[-1][0]
 
-for novelName in BOOKMARKS:
-	bookmarkLink = download_novel(novelName, BOOKMARKS[novelName][0], BOOKMARKS[novelName][1])
-	BOOKMARKS[novelName][1] = bookmarkLink
 
-print('DONE')
-fp = codecs.open('bookmarks.py', 'w', 'utf-8')
-fp.write('# -*- coding: utf-8 -*-\n')
-fp.write('BOOKMARKS = {\n')
-fp.write('\t# name : [content_link, bookmark_link]\n')
-novelNames = list(BOOKMARKS.keys())
-novelNames.sort()
-for novelName  in novelNames:
-	fp.write("\t'%s' : ['%s', '%s'],\n" % (novelName, BOOKMARKS[novelName][0], BOOKMARKS[novelName][1]))
-fp.write('}\n')
-fp.close()
+if __name__ == '__main__':
+	start = timer()
+	for novelName in BOOKMARKS:
+		bookmarkLink = download_novel(novelName, BOOKMARKS[novelName][0], BOOKMARKS[novelName][1])
+		BOOKMARKS[novelName][1] = bookmarkLink
+	end = timer()
+
+	print('DONE')
+	print('Total time: %.3f seconds' % (end - start))
+
+	fp = codecs.open('bookmarks.py', 'w', 'utf-8')
+	fp.write('# -*- coding: utf-8 -*-\n')
+	fp.write('BOOKMARKS = {\n')
+	fp.write('\t# name : [content_link, bookmark_link]\n')
+	novelNames = list(BOOKMARKS.keys())
+	novelNames.sort()
+	for novelName  in novelNames:
+		fp.write("\t'%s' : ['%s', '%s'],\n" % (novelName, BOOKMARKS[novelName][0], BOOKMARKS[novelName][1]))
+	fp.write('}\n')
+	fp.close()
