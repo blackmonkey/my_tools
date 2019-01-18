@@ -7,7 +7,7 @@ BOOKMARKS = {
 	'宠物天王' : ['https://www.pbtxt.com/94904/', 'https://www.pbtxt.com/94904/38457818.html'],
 	'我有一个异世界' : ['https://www.boquge.com/book/72110/', 'https://www.boquge.com/book/72110/160489809.html'],
 	'我有个时空门' : ['https://www.pbtxt.com/82775/', 'https://www.pbtxt.com/82775/25514697.html'],
-	'放开那个女巫' : ['https://www.boquge.com/book/26136/', 'https://www.boquge.com/book/26136/161235883.html'],
+	'放开那个女巫' : ['https://www.boquge.com/book/26136/', 'https://www.boquge.com/book/26136/161254737.html'],
 	'明朝败家子' : ['https://www.boquge.com/book/86295/', 'https://www.boquge.com/book/86295/161236578.html'],
 	'最后一个契约者' : ['https://www.boquge.com/book/88327/', 'https://www.boquge.com/book/88327/161232437.html'],
 	'最后一艘歼星舰' : ['https://www.boquge.com/book/87515/', 'https://www.boquge.com/book/87515/158230513.html'],

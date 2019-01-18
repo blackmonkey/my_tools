@@ -104,7 +104,7 @@ def get_section_pbtxt(link, title):
 ####################################################################################################
 
 CONTENT_LINK_PAT_boquge = re.compile(r'<a href="/book/[0-9]+/([0-9]+).html">(.+?)</a>')
-SECTION_CONTENT_PAT_boquge = re.compile(r'<div id="txtContent">\s+(.*?)<br/>\s+</div>', re.S)
+SECTION_CONTENT_PAT_boquge = re.compile(r'<div id="txtContent">\s+(.*?)(?:<br/>)?\s+</div>', re.S)
 REMOVE_PATS_boquge = [
 	re.compile(r"<div class='gad2'><script type='text/javascript'>try\{mad1\(\);\} catch\(ex\)\{\}</script></div>", re.I),
 	re.compile(r'www.boquge.com', re.I)
