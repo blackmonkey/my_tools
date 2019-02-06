@@ -1,4 +1,3 @@
-
 // System's information
 var SYSTEMS = {
 	// SystemName : [SystemId, GalaxyName],
@@ -304,21 +303,35 @@ var SYSTEMS = {
 }
 
 function getCurrentSystem() {
-    var address = $('td:contains("Current System")').text();
-    address.match(/Current System:\s+([\w\s]+)\s+/g);
-    return RegExp.$1.trim();
+	var address = $('td:contains("Current System")').text();
+	address.match(/Current System:\s+([\w\s]+)\s+/g);
+	return RegExp.$1.trim();
 }
 
-function getRouteInfo(curSystem, dstSystem, callback, ...kwargs) {
-    var curSystemId = SYSTEMS[curSystem][0];
-    var dstSystemId = SYSTEMS[dstSystem][0];
-    var sessionId = location.href.split('/')[3];
-    var url = 'http://www.core-exiles.com/' + sessionId + '/route/index.php?start=' + curSystemId + '&end=' + dstSystemId;
-    $.get(url, function(htmlCode) {
-        htmlCode.match(/plot route:.*?<BR>(.*)<p>.*?<\/strong>(.*?)<\/p>/g);
-        var route = RegExp.$1;
-        var fuel = parseInt(RegExp.$2.replace(/\D/g, ''));
+var ROUTE_REQUESTS = new Array();
+function pushRouteRequest(curSystem, dstSystem, callback, ...kwargs) {
+	var curSystemId = SYSTEMS[curSystem][0];
+	var dstSystemId = SYSTEMS[dstSystem][0];
+	var sessionId = location.href.split('/')[3];
+	var url = 'http://www.core-exiles.com/' + sessionId + '/route/index.php?start=' + curSystemId + '&end=' + dstSystemId;
 
-        callback.apply(this, kwargs.concat([route, fuel]));
-    });
+	ROUTE_REQUESTS.push([url, callback, kwargs])
+}
+
+function getRouteInfos() {
+	if (ROUTE_REQUESTS.length > 0) {
+		var params = ROUTE_REQUESTS.shift();
+		var url = params[0];
+		var callback = params[1];
+		var kwargs = params[2];
+
+		$.get(url, function(htmlCode) {
+			htmlCode.match(/plot route:.*?<BR>(.*)<p>.*?<\/strong>(.*?)<\/p>/g);
+			var route = RegExp.$1;
+			var fuel = parseInt(RegExp.$2.replace(/\D/g, ''));
+
+			callback.apply(this, kwargs.concat([route, fuel]));
+			setTimeoutInterval(getRouteInfos, 500);
+		});
+	}
 }
