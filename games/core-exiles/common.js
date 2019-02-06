@@ -331,7 +331,7 @@ function getRouteInfos() {
 			var fuel = parseInt(RegExp.$2.replace(/\D/g, ''));
 
 			callback.apply(this, kwargs.concat([route, fuel]));
-			setTimeout(getRouteInfos, 500);
+			setTimeout(getRouteInfos, 350);
 		});
 	}
 }
