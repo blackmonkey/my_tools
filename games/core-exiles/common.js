@@ -1,5 +1,5 @@
 
-// System's IDs
+// System's information
 var SYSTEMS = {
 	// SystemName : [SystemId, GalaxyName],
 	'Aleksin': [240, 'Furnace'],
@@ -303,3 +303,22 @@ var SYSTEMS = {
 	'Zhusul': [108, 'Verec-per'],
 }
 
+function getCurrentSystem() {
+    var address = $('td:contains("Current System")').text();
+    address.match(/Current System:\s+([\w\s]+)\s+/g);
+    return RegExp.$1.trim();
+}
+
+function getRouteInfo(curSystem, dstSystem, callback, ...kwargs) {
+    var curSystemId = SYSTEMS[curSystem][0];
+    var dstSystemId = SYSTEMS[dstSystem][0];
+    var sessionId = location.href.split('/')[3];
+    var url = 'http://www.core-exiles.com/' + sessionId + '/route/index.php?start=' + curSystemId + '&end=' + dstSystemId;
+    $.get(url, function(htmlCode) {
+        htmlCode.match(/plot route:.*?<BR>(.*)<p>.*?<\/strong>(.*?)<\/p>/g);
+        var route = RegExp.$1;
+        var fuel = parseInt(RegExp.$2.replace(/\D/g, ''));
+
+        callback.apply(this, kwargs.concat([route, fuel]));
+    });
+}
