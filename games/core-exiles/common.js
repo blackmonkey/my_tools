@@ -45064,15 +45064,15 @@ function getRouteInfo(curSystem, dstSystem, callback, ...kwargs) {
 		route = ROUTES[routeKey].slice();
 		fuel = route.pop();
 		var routeTxt = curSystem;
-		for (var sysId in route) {
-			var sysName = sysId;
+		for (var i = 0; i < route.length; i++) {
+			var sysName = route[i];
 			for (var sName in SYSTEMS) {
-				if (SYSTEMS[sName][0] == sysId) {
+				if (SYSTEMS[sName][0] == route[i]) {
 					sysName = sName;
 					break;
 				}
 			}
-			routeTxt = routeTxt + '>' + sysName;
+			routeTxt += '>' + sysName;
 		}
 		route = routeTxt + '>' + dstSystem;
 	}
