@@ -45055,14 +45055,21 @@ function getRouteInfo(curSystem, dstSystem, callback, ...kwargs) {
 	var curSystemId = SYSTEMS[curSystem][0];
 	var dstSystemId = SYSTEMS[dstSystem][0];
 	var routeKey = curSystemId + '-' + dstSystemId;
+	var doReverse = false;
 	if (!(routeKey in ROUTES)) {
 		routeKey = dstSystemId + '-' + curSystemId;
+		doReverse = true;
 	}
 	var route = '';
 	var fuel = 0;
 	if (routeKey in ROUTES) {
 		route = ROUTES[routeKey].slice();
 		fuel = route.pop();
+
+		if (doReverse) {
+			route.reverse();
+		}
+
 		var routeTxt = curSystem;
 		for (var i = 0; i < route.length; i++) {
 			var sysName = route[i];
