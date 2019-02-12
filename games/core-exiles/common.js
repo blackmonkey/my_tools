@@ -45084,6 +45084,6 @@ function getCharLevel() {
 }
 
 function isInvalidRoute(route, level) {
-	return route.includes('Kelsey -> Aurelia') || route.includes('Aurelia -> Kelsey')
-		|| ((route.includes('-> Yam ->') || route.includes('-> Yam') || route.includes('Yam ->')) && level < 30);
+	return route.includes('Kelsey>Aurelia') || route.includes('Aurelia>Kelsey')
+		|| ((route.includes('>Yam') || route.includes('Yam>')) && level < 30);
 }
