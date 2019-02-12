@@ -45074,7 +45074,7 @@ function getRouteInfo(curSystem, dstSystem, callback, ...kwargs) {
 			}
 			routeTxt = routeTxt + '>' + sysName;
 		}
-		routeTxt = routeTxt + '>' + dstSystem;
+		route = routeTxt + '>' + dstSystem;
 	}
 	callback.apply(this, kwargs.concat([route, fuel]));
 }
