@@ -45079,9 +45079,9 @@ function getRouteInfo(curSystem, dstSystem, callback, ...kwargs) {
 					break;
 				}
 			}
-			routeTxt += '>' + sysName;
+			routeTxt += ' > ' + sysName;
 		}
-		route = routeTxt + '>' + dstSystem;
+		route = routeTxt + ' > ' + dstSystem;
 	}
 	callback.apply(this, kwargs.concat([route, fuel]));
 }
@@ -45091,6 +45091,6 @@ function getCharLevel() {
 }
 
 function isInvalidRoute(route, level) {
-	return route.includes('Kelsey>Aurelia') || route.includes('Aurelia>Kelsey')
-		|| ((route.includes('>Yam') || route.includes('Yam>')) && level < 30);
+	return route.includes('Kelsey > Aurelia') || route.includes('Aurelia > Kelsey')
+		|| ((route.includes('> Yam') || route.includes('Yam >')) && level < 30);
 }
