@@ -45046,22 +45046,22 @@ var SYSTEMS = {
 }
 
 function getCurrentSystem() {
-	var address = $('td:contains("Current System")').text();
+	let address = $('td:contains("Current System")').text();
 	address.match(/Current System:\s+([\w\s]+)\s+/g);
 	return RegExp.$1.trim();
 }
 
-function getRouteInfo(curSystem, dstSystem, callback, ...kwargs) {
-	var curSystemId = SYSTEMS[curSystem][0];
-	var dstSystemId = SYSTEMS[dstSystem][0];
-	var routeKey = curSystemId + '-' + dstSystemId;
-	var doReverse = false;
+function getRouteInfo(startSystem, dstSystem, callback, ...kwargs) {
+	let startSystemId = SYSTEMS[startSystem][0];
+	let dstSystemId = SYSTEMS[dstSystem][0];
+	let routeKey = startSystemId + '-' + dstSystemId;
+	let doReverse = false;
 	if (!(routeKey in ROUTES)) {
-		routeKey = dstSystemId + '-' + curSystemId;
+		routeKey = dstSystemId + '-' + startSystemId;
 		doReverse = true;
 	}
-	var route = '';
-	var fuel = 0;
+	let route = '';
+	let fuel = 0;
 	if (routeKey in ROUTES) {
 		route = ROUTES[routeKey].slice();
 		fuel = route.pop();
@@ -45070,18 +45070,28 @@ function getRouteInfo(curSystem, dstSystem, callback, ...kwargs) {
 			route.reverse();
 		}
 
-		var routeTxt = curSystem;
-		for (var i = 0; i < route.length; i++) {
-			var sysName = route[i];
-			for (var sName in SYSTEMS) {
-				if (SYSTEMS[sName][0] == route[i]) {
-					sysName = sName;
+		route.unshift(startSystemId);
+		route.push(dstSystemId);
+		let preGalaxy = SYSTEMS[startSystem][1];
+		for (let i = 1; i < route.length - 1; i++) {
+			let sysId = route[i];
+			for (let sysName in SYSTEMS) {
+				if (SYSTEMS[sysName][0] == sysId) {
+					let curGalaxy = SYSTEMS[sysName][1];
+					if (curGalaxy != preGalaxy) {
+						route[i] = sysName + '(' + curGalaxy + ')';
+						preGalaxy = curGalaxy;
+					} else {
+						route[i] = sysName;
+					}
 					break;
 				}
 			}
-			routeTxt += ' > ' + sysName;
 		}
-		route = routeTxt + ' > ' + dstSystem;
+
+		route[0] = startSystem + '(' + SYSTEMS[startSystem][1] + ')';
+		route[route.length - 1] = dstSystem + '(' + SYSTEMS[dstSystem][1] + ')';
+		route = route.join(' > ');
 	}
 	callback.apply(this, kwargs.concat([route, fuel]));
 }
