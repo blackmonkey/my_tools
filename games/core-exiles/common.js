@@ -45061,7 +45061,7 @@ function getRouteInfo(curSystem, dstSystem, callback, ...kwargs) {
 	var route = '';
 	var fuel = 0;
 	if (routeKey in ROUTES) {
-		route = ROUTES[routeKey];
+		route = ROUTES[routeKey].slice();
 		fuel = route.pop();
 		var routeTxt = curSystem;
 		for (var sysId in route) {
