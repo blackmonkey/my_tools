@@ -159,4 +159,4 @@ class Match {
 // for console running
 GLOBAL.waldo = Object.assign({}, find, {debug: true});
 
-export default find;
+//export default find;
