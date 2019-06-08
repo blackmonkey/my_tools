@@ -1,5 +1,6 @@
 	# the end
 	'星之海洋' : ['https://www.pbtxt.com/83564/', 'https://www.pbtxt.com/83564/25593970.html'],
+	'大王饶命' : ['https://www.pbtxt.com/99792/', 'https://www.pbtxt.com/99792/40418474.html'],
 
 	# break
 	'兼职大反派' : ['http://www.pbtxt.com/99700/', 'http://www.pbtxt.com/99700/32141990.html'],
@@ -26,3 +27,4 @@
 	'大魏宫廷' : ['http://www.pbtxt.com/66790/', 'http://www.pbtxt.com/66790/33515131.html'],
 	'真科技无双' : ['http://www.pbtxt.com/99287/', 'http://www.pbtxt.com/99287/33611632.html'],
 	'时间掠夺' : ['http://www.pbtxt.com/103973/', 'http://www.pbtxt.com/103973/33610943.html'],
+	'氪命玩家' : ['https://www.boquge.com/book/90702/', 'https://www.boquge.com/book/90702/161216984.html'],
