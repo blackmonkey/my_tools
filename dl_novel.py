@@ -1,6 +1,8 @@
 ﻿# -*- coding: utf-8 -*-
 import codecs, requests, sys, re, functools, urllib, pprint, os, time
 from urllib.parse import urljoin
+from urllib.parse import quote as urlquote
+from urllib.parse import unquote as urlunquote
 from bookmarks import BOOKMARKS
 from timeit import default_timer as timer
 
@@ -16,6 +18,17 @@ def err(msg):
 def wrn(msg):
 	tr('WARN', msg)
 
+def web_proxy_url(url):
+	url = urlquote(url, safe='')
+	return 'http://webproxy.to/browse.php?u=' + url + '&b=4'
+
+def un_web_proxy_url(match):
+	return urlunquote(match.group(1))
+
+WEB_PROXY_URL_PAT = re.compile('/browse\.php\?u=(http.*?)&amp;b=4')
+def un_web_proxy_html(html):
+	return WEB_PROXY_URL_PAT.sub(un_web_proxy_url, html)
+
 REQUEST_TIMEOUT = 60 # 1 minutes
 REQUEST_MAX_RETRY = 5
 CHARSET_PAT = re.compile(b'content\s*=\s*"\s*text\s*/\s*html\s*;\s*charset\s*=\s*([^"]+)\s*"')
@@ -23,6 +36,7 @@ def get_html(url, encoding):
 	content = ''
 	for retry in range(REQUEST_MAX_RETRY):
 		try:
+#			r = requests.get(web_proxy_url(url), timeout = REQUEST_TIMEOUT)
 			r = requests.get(url, timeout = REQUEST_TIMEOUT)
 			if r.status_code == 200:
 				content = r.content
@@ -51,6 +65,7 @@ def get_html(url, encoding):
 	for coding in html_encoding:
 		try:
 			decoded_html = codecs.decode(content, coding)
+#			return un_web_proxy_html(decoded_html)
 			return decoded_html
 		except UnicodeDecodeError:
 			pass
@@ -64,34 +79,35 @@ def cmp_str_int(first, second):
 	return int(first) - int(second)
 
 ####################################################################################################
-# Utilities of http://www.pbtxt.com
+# Utilities of http://www.77nt.com
 ####################################################################################################
 
-CONTENT_LINK_PAT_pbtxt = re.compile(r'<dd><a href="([0-9]+).html">(.+?)</a></dd>')
-SECTION_CONTENT_PAT_pbtxt = re.compile(r'(?:&nbsp;)+.*?(?=<br\s|<div\s)')
-WEBSITE_PAT_pbtxt = re.compile(r'www.pbtxt.com', re.I)
-def get_content_links_pbtxt(link):
-	return get_content_links_common(link, CONTENT_LINK_PAT_pbtxt)
+#CONTENT_LINK_PAT_77nt = re.compile(r'<dd><a href="https://www.77nt.com/[0-9]+/([0-9]+).html">(.+?)</a></dd>')
+CONTENT_LINK_PAT_77nt = re.compile(r'<dd><a href="([0-9]+).html">(.+?)</a></dd>')
+SECTION_CONTENT_PAT_77nt = re.compile(r'(?:&nbsp;)+.*?(?=<br\s|<div\s)')
+WEBSITE_PAT_77nt = re.compile(r'www.77nt.com', re.I)
+def get_content_links_77nt(link):
+	return get_content_links_common(link, CONTENT_LINK_PAT_77nt)
 
-def get_section_pbtxt_1(link, title):
+def get_section_77nt_1(link, title):
 	html = get_html(link, 'utf8')
-	paragraphs = SECTION_CONTENT_PAT_pbtxt.findall(html)
+	paragraphs = SECTION_CONTENT_PAT_77nt.findall(html)
 	if len(paragraphs) == 0:
 		return title + '\r\n\r\n' + link + '\r\n\r\n'
 	for i in range(len(paragraphs)):
-		paragraphs[i] = re.sub(WEBSITE_PAT_pbtxt, '', paragraphs[i].replace('&nbsp;', ' ').strip())
+		paragraphs[i] = re.sub(WEBSITE_PAT_77nt, '', paragraphs[i].replace('&nbsp;', ' ').strip())
 	return title + '\r\n\r\n' + '\r\n\r\n'.join(paragraphs) + '\r\n\r\n'
 
-ALL_CONTENT_PAT_pbtxt = re.compile(r'<div\s+id\s*=\s*"content[0-9]+"\s+class\s*=\s*"content\s+novel[0-9]+\s+chapter[0-9]+\s*"\s*>(.+)<div\s+class\s*=\s*"other_links"\s*>')
-def get_section_pbtxt(link, title):
+ALL_CONTENT_PAT_77nt = re.compile(r'<div\s+id\s*=\s*"content[0-9]+"\s+class\s*=\s*"content\s+novel[0-9]+\s+chapter[0-9]+\s*"\s*>(.+)<div\s+class\s*=\s*"other_links"\s*>')
+def get_section_77nt(link, title):
 	html = get_html(link, 'utf8')
-	content = ALL_CONTENT_PAT_pbtxt.findall(html)
+	content = ALL_CONTENT_PAT_77nt.findall(html)
 	if len(content) == 0:
 		content = link
 	else:
 		content = content[0].replace('&nbsp;', ' ')
-		content = re.sub(re.compile(r'www\.pbtxt\.com', re.I), '', content)
-		content = re.sub(re.compile(r'pbtxt\.com 平板电子书', re.I), '', content)
+		content = re.sub(re.compile(r'www\.77nt\.com', re.I), '', content)
+		content = re.sub(re.compile(r'77nt\.com 平板电子书', re.I), '', content)
 		content = re.sub(re.compile(r'<br\s*/>'), '\n', content)
 		content = re.sub(re.compile(r'<a\s+href\s*=[^>]+>[^<]+</a>'), '', content)
 		content = re.sub(re.compile(r'<script\s*[^>]+>[^<]+</script>'), '', content)
@@ -103,6 +119,7 @@ def get_section_pbtxt(link, title):
 # Utilities of http://www.boquge.com/
 ####################################################################################################
 
+#CONTENT_LINK_PAT_boquge = re.compile(r'<a href="https://www.boquge.com/book/[0-9]+/([0-9]+).html">(.+?)</a>')
 CONTENT_LINK_PAT_boquge = re.compile(r'<a href="/book/[0-9]+/([0-9]+).html">(.+?)</a>')
 SECTION_CONTENT_PAT_boquge = re.compile(r'<div id="txtContent">\s+(.*?)(?:<br/>)?\s+</div>', re.S)
 REMOVE_PATS_boquge = [
@@ -174,7 +191,7 @@ def get_content_links(link):
 		return get_content_links_boquge(link)
 	elif 'book9.net' in link:
 		return get_content_links_book9(link)
-	return get_content_links_pbtxt(link)
+	return get_content_links_77nt(link)
 
 def get_section(link, title):
 	log('downloading ' + title)
@@ -182,7 +199,7 @@ def get_section(link, title):
 		return get_section_boquge(link, title)
 	elif 'book9.net' in link:
 		return get_section_book9(link, title)
-	return get_section_pbtxt(link, title)
+	return get_section_77nt(link, title)
 
 def download_novel(novelName, contentLink, bookmarkLink):
 	log('---- checking %s ----' % (novelName))
