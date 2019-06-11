@@ -6,6 +6,8 @@ from urllib.parse import unquote as urlunquote
 from bookmarks import BOOKMARKS
 from timeit import default_timer as timer
 
+# can download noval from http://downnovel.com/
+
 def tr(tag, msg):
 	sys.stdout.write('[%s] %s\n' % (tag, msg))
 
@@ -18,9 +20,8 @@ def err(msg):
 def wrn(msg):
 	tr('WARN', msg)
 
-def web_proxy_url(url):
-	url = urlquote(url, safe='')
-	return 'http://webproxy.to/browse.php?u=' + url + '&b=4'
+def web_proxy_params(url):
+	return {'u':url, 'b':'4', 'f':'norefer'}
 
 def un_web_proxy_url(match):
 	return urlunquote(match.group(1))
@@ -32,24 +33,30 @@ def un_web_proxy_html(html):
 REQUEST_TIMEOUT = 60 # 1 minutes
 REQUEST_MAX_RETRY = 5
 CHARSET_PAT = re.compile(b'content\s*=\s*"\s*text\s*/\s*html\s*;\s*charset\s*=\s*([^"]+)\s*"')
+USE_WEB_PROXY = False
+g_referer = 'http://webproxy.to/'
 def get_html(url, encoding):
+	global g_referer
 	content = ''
 	for retry in range(REQUEST_MAX_RETRY):
 		try:
-#			r = requests.get(web_proxy_url(url), timeout = REQUEST_TIMEOUT)
-			r = requests.get(url, timeout = REQUEST_TIMEOUT)
+			if USE_WEB_PROXY:
+				r = requests.get('http://webproxy.to/browse.php', params=web_proxy_params(url), headers={'Referer': g_referer}, timeout=REQUEST_TIMEOUT)
+			else:
+				r = requests.get(url, headers={'Referer': g_referer}, timeout = REQUEST_TIMEOUT)
+			g_referer = r.url
 			if r.status_code == 200:
 				content = r.content
 				break
 			else:
-				wrn('retry ' + str(retry) + ' getting ' + url)
+				wrn('got status {}, retry {} getting {}'.format(r.status_code, retry, url))
 				time.sleep(30)
-		except:
-			wrn('retry ' + str(retry) + ' getting ' + url)
+		except Exception as e:
+			wrn('got except {}, retry {} getting {}'.format(e, retry, url))
 			time.sleep(30)
 
 	if len(content) < 1:
-		err('failed to get %s, content is empty' % (url))
+		err('failed to get {}, content is empty'.format(url))
 		return ''
 
 	html_encoding = [encoding]
@@ -65,8 +72,7 @@ def get_html(url, encoding):
 	for coding in html_encoding:
 		try:
 			decoded_html = codecs.decode(content, coding)
-#			return un_web_proxy_html(decoded_html)
-			return decoded_html
+			return un_web_proxy_html(decoded_html) if USE_WEB_PROXY else decoded_html
 		except UnicodeDecodeError:
 			pass
 
@@ -82,8 +88,7 @@ def cmp_str_int(first, second):
 # Utilities of http://www.77nt.com
 ####################################################################################################
 
-#CONTENT_LINK_PAT_77nt = re.compile(r'<dd><a href="https://www.77nt.com/[0-9]+/([0-9]+).html">(.+?)</a></dd>')
-CONTENT_LINK_PAT_77nt = re.compile(r'<dd><a href="([0-9]+).html">(.+?)</a></dd>')
+CONTENT_LINK_PAT_77nt = re.compile(r'<dd><a href="https://www.77nt.com/[0-9]+/([0-9]+).html">(.+?)</a></dd>') if USE_WEB_PROXY else re.compile(r'<dd><a href="([0-9]+).html">(.+?)</a></dd>')
 SECTION_CONTENT_PAT_77nt = re.compile(r'(?:&nbsp;)+.*?(?=<br\s|<div\s)')
 WEBSITE_PAT_77nt = re.compile(r'www.77nt.com', re.I)
 def get_content_links_77nt(link):
@@ -119,8 +124,7 @@ def get_section_77nt(link, title):
 # Utilities of http://www.boquge.com/
 ####################################################################################################
 
-#CONTENT_LINK_PAT_boquge = re.compile(r'<a href="https://www.boquge.com/book/[0-9]+/([0-9]+).html">(.+?)</a>')
-CONTENT_LINK_PAT_boquge = re.compile(r'<a href="/book/[0-9]+/([0-9]+).html">(.+?)</a>')
+CONTENT_LINK_PAT_boquge = re.compile(r'<a href="https://www.boquge.com/book/[0-9]+/([0-9]+).html">(.+?)</a>') if USE_WEB_PROXY else re.compile(r'<a href="/book/[0-9]+/([0-9]+).html">(.+?)</a>')
 SECTION_CONTENT_PAT_boquge = re.compile(r'<div id="txtContent">\s+(.*?)(?:<br/>)?\s+</div>', re.S)
 REMOVE_PATS_boquge = [
 	re.compile(r"<div class='gad2'><script type='text/javascript'>try\{mad1\(\);\} catch\(ex\)\{\}</script></div>", re.I),
@@ -175,6 +179,11 @@ def cmp_content_links_common(first, second):
 
 def get_content_links_common(link, regpat, suffix = '.html'):
 	html = get_html(link, 'utf8')
+
+#	fp = codecs.open(link.split('/')[-2], 'w', 'utf8')
+#	fp.write(html)
+#	fp.close()
+
 	content_links = regpat.findall(html)
 	content_links.sort(key=functools.cmp_to_key(cmp_content_links_common))
 	unique_links = []
@@ -210,7 +219,7 @@ def download_novel(novelName, contentLink, bookmarkLink):
 	newSections = []
 
 	fname = novelName + '.txt'
-	fencoding = 'gb18030'
+	fencoding = 'utf8'
 
 	dumpTitle = True
 	if os.path.exists(fname):
