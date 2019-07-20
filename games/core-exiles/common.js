@@ -45101,5 +45101,5 @@ function getCharLevel() {
 }
 
 function isInvalidRoute(route, level) {
-	return route.includes('(Furnace)') || route.includes('(Expanse)');
+	return route.includes('(Furnace)') || route.includes('(Expanse)') || route.includes('(Anvil)');
 }
