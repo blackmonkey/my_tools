@@ -1,18 +1,20 @@
-	'放开那个女巫' : ['https://www.boquge.com/book/26136/', 'https://www.boquge.com/book/26136/161254737.html'],
-	'超神制卡师' : ['https://www.boquge.com/book/95998/', 'https://www.boquge.com/book/95998/161228293.html'],
-
 	# the end
 	'星之海洋' : ['https://www.pbtxt.com/83564/', 'https://www.pbtxt.com/83564/25593970.html'],
 	'大王饶命' : ['https://www.pbtxt.com/99792/', 'https://www.pbtxt.com/99792/40418474.html'],
 	'我有一个异世界' : ['https://www.boquge.com/book/72110/', 'https://www.boquge.com/book/72110/160489809.html'],
 	'最后一艘歼星舰' : ['https://www.boquge.com/book/87515/', 'https://www.boquge.com/book/87515/158230513.html'],
 	'说好的末世呢' : ['https://www.biquge5200.cc/98_98364/', 'https://www.biquge5200.cc/98_98364/159067424.html'],
+	'宠物天王' : ['https://www.biquge5200.cc/68_68067/', 'https://www.biquge5200.cc/68_68067/168289562.html'],
+	'死在火星上' : ['https://www.biquge5200.cc/111_111337/', 'https://www.biquge5200.cc/111_111337/168230169.html'],
 
 	# break
 	'兼职大反派' : ['http://www.pbtxt.com/99700/', 'http://www.pbtxt.com/99700/32141990.html'],
 	'超星空文明' : ['https://www.77nt.com/83065/', 'https://www.77nt.com/83065/27410745.html'],
+	'漫威归来的发明家' : ['https://www.biquge5200.cc/114_114827/', 'https://www.biquge5200.cc/114_114827/166961118.html'],
 
 	# don't wanna read any more
+	'放开那个女巫' : ['https://www.boquge.com/book/26136/', 'https://www.boquge.com/book/26136/161254737.html'],
+	'超神制卡师' : ['https://www.boquge.com/book/95998/', 'https://www.boquge.com/book/95998/161228293.html'],
 	'低维游戏' : ['http://www.pbtxt.com/105079/', 'http://www.pbtxt.com/105079/33878549.html'],
 	'程序员修真之路' : ['http://www.pbtxt.com/102225/', 'http://www.pbtxt.com/102225/33856765.html'],
 	'掠天记' : ['http://www.pbtxt.com/33899/', 'http://www.pbtxt.com/33899/23583060.html'],
@@ -45,3 +47,6 @@
 	'这里有妖气' : ['https://www.boquge.com/book/84574/', 'https://www.boquge.com/book/84574/161237689.html'],
 	'黑夜进化' : ['https://www.boquge.com/book/91117/', 'https://www.boquge.com/book/91117/161221852.html'],
 	'都市剑说' : ['https://www.boquge.com/book/81479/', 'https://www.boquge.com/book/81479/161238339.html'],
+	'明朝败家子' : ['https://www.biquge5200.cc/96_96421/', 'https://www.biquge5200.cc/96_96421/166602392.html'],
+	'深空大领主' : ['https://www.biquge5200.cc/111_111905/', 'https://www.biquge5200.cc/111_111905/164155495.html'],
+	'影视世界旅行家' : ['https://www.biquge5200.cc/120_120929/', 'https://www.biquge5200.cc/120_120929/166214271.html'],
