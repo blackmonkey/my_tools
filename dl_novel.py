@@ -81,9 +81,6 @@ def get_html(url, encoding):
 	pprint.pprint(content)
 	return ''
 
-def cmp_str_int(first, second):
-	return int(first) - int(second)
-
 ####################################################################################################
 # Utilities of http://www.77nt.com
 ####################################################################################################
@@ -98,10 +95,10 @@ def get_section_77nt_1(link, title):
 	html = get_html(link, 'utf8')
 	paragraphs = SECTION_CONTENT_PAT_77nt.findall(html)
 	if len(paragraphs) == 0:
-		return title + '\r\n\r\n' + link + '\r\n\r\n'
+		return title + '\n\n' + link + '\n\n'
 	for i in range(len(paragraphs)):
 		paragraphs[i] = re.sub(WEBSITE_PAT_77nt, '', paragraphs[i].replace('&nbsp;', ' ').strip())
-	return title + '\r\n\r\n' + '\r\n\r\n'.join(paragraphs) + '\r\n\r\n'
+	return title + '\n\n' + '\n\n'.join(paragraphs) + '\n\n'
 
 ALL_CONTENT_PAT_77nt = re.compile(r'<div\s+id\s*=\s*"content[0-9]+"\s+class\s*=\s*"content\s+novel[0-9]+\s+chapter[0-9]+\s*"\s*>(.+)<div\s+class\s*=\s*"other_links"\s*>')
 def get_section_77nt(link, title):
@@ -117,8 +114,8 @@ def get_section_77nt(link, title):
 		content = re.sub(re.compile(r'<a\s+href\s*=[^>]+>[^<]+</a>'), '', content)
 		content = re.sub(re.compile(r'<script\s*[^>]+>[^<]+</script>'), '', content)
 		content = re.sub(re.compile(r'<div\s*[^>]+>[^<]*</div>'), '', content)
-		content = re.sub(re.compile(r'\n\s+'), '\r\n\r\n', content).strip()
-	return title + '\r\n\r\n' + content + '\r\n\r\n'
+		content = re.sub(re.compile(r'\n\s+'), '\n\n', content).strip()
+	return title + '\n\n' + content + '\n\n'
 
 ####################################################################################################
 # Utilities of http://www.boquge.com/
@@ -137,7 +134,7 @@ def get_section_boquge(link, title):
 	html = get_html(link, 'utf8')
 	content = SECTION_CONTENT_PAT_boquge.findall(html)
 	if len(content) == 0:
-		return title + '\r\n\r\n' + link + '\r\n\r\n'
+		return title + '\n\n' + link + '\n\n'
 	for i in range(len(content)):
 		content[i] = content[i].replace('&nbsp;', ' ')
 		for pat in REMOVE_PATS_boquge:
@@ -148,8 +145,40 @@ def get_section_boquge(link, title):
 			l = l.strip()
 			if len(l) > 0:
 				lines.append(l)
-		content[i] = '\r\n\r\n'.join(lines)
-	return title + '\r\n\r\n' + '\r\n\r\n'.join(content) + '\r\n\r\n'
+		content[i] = '\n\n'.join(lines)
+	return title + '\n\n' + '\n\n'.join(content) + '\n\n'
+
+####################################################################################################
+# Utilities of http://www.biquge5200.cc/
+####################################################################################################
+
+CONTENT_LINK_PAT_boquge_cc = re.compile(r'<a href="https://www.biquge5200.cc/[0-9_]+/([0-9]+).html">(.+?)</a>')
+SECTION_CONTENT_PAT_boquge_cc = re.compile(r'<div id="content">\s*(.*?)\s*</div>', re.S)
+REMOVE_PATS_boquge_cc = [
+	re.compile(r'</p>', re.I),
+	re.compile(r'</br>', re.I),
+	re.compile(r'小说网..org，最快更新地球灭亡倒计时最新章节！')
+]
+def get_content_links_boquge_cc(link):
+	return get_content_links_common(link, CONTENT_LINK_PAT_boquge_cc)
+
+def get_section_boquge_cc(link, title):
+	html = get_html(link, 'utf8')
+	content = SECTION_CONTENT_PAT_boquge_cc.findall(html)
+	if len(content) == 0:
+		return title + '\n\n' + link + '\n\n'
+	for i in range(len(content)):
+		content[i] = content[i].replace('&nbsp;', ' ')
+		for pat in REMOVE_PATS_boquge_cc:
+			content[i] = re.sub(pat, '', content[i])
+		content[i] = content[i].split('<p>')
+		lines = []
+		for l in content[i]:
+			l = l.strip()
+			if len(l) > 0:
+				lines.append(l)
+		content[i] = '\n\n'.join(lines)
+	return title + '\n\n' + '\n\n'.join(content) + '\n\n'
 
 ####################################################################################################
 # Utilities of https://www.book9.net/
@@ -165,17 +194,25 @@ def get_section_book9(link, title):
 	html = get_html(link, 'utf8')
 	paragraphs = SECTION_CONTENT_PAT_book9.findall(html)
 	if len(paragraphs) == 0:
-		return title + '\r\n\r\n' + link + '\r\n\r\n'
+		return title + '\n\n' + link + '\n\n'
 	for i in range(len(paragraphs)):
 		paragraphs[i] = paragraphs[i].replace('&nbsp;', ' ').strip()
-	return title + '\r\n\r\n' + '\r\n\r\n'.join(paragraphs) + '\r\n\r\n'
+	return title + '\n\n' + '\n\n'.join(paragraphs) + '\n\n'
 
 ####################################################################################################
 # General utilities
 ####################################################################################################
 
 def cmp_content_links_common(first, second):
-	return cmp_str_int(first[0], second[0])
+	firstSection = first[0]
+	secondSection = second[0]
+	if firstSection.isdigit() and secondSection.isdigit():
+		return int(firstSection) - int(secondSection)
+	if firstSection < secondSection:
+		return -1
+	if firstSection > secondSection:
+		return 1
+	return 0
 
 def get_content_links_common(link, regpat, suffix = '.html'):
 	html = get_html(link, 'utf8')
@@ -198,6 +235,8 @@ def get_content_links(link):
 	log('downloading content lists')
 	if '.boquge.com' in link:
 		return get_content_links_boquge(link)
+	elif 'biquge5200.cc' in link:
+		return get_content_links_boquge_cc(link)
 	elif 'book9.net' in link:
 		return get_content_links_book9(link)
 	return get_content_links_77nt(link)
@@ -206,6 +245,8 @@ def get_section(link, title):
 	log('downloading ' + title)
 	if '.boquge.com' in link:
 		return get_section_boquge(link, title)
+	elif 'biquge5200.cc' in link:
+		return get_section_boquge_cc(link, title)
 	elif 'book9.net' in link:
 		return get_section_book9(link, title)
 	return get_section_77nt(link, title)
@@ -246,7 +287,7 @@ def download_novel(novelName, contentLink, bookmarkLink):
 			log('Found bookmark ' + sectionTitle)
 			if dumpTitle:
 				fp.write(novelName)
-				fp.write('\r\n\r\n')
+				fp.write('\n\n')
 		elif foundBookmark:
 			fp.write(get_section(sectionLink, sectionTitle))
 
