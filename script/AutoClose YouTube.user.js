@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         AutoClose YouTube
-// @namespace    http://tampermonkey.net/
-// @version      0.1
+// @namespace    https://github.com/blackmonkey/
+// @version      0.2
 // @description  Control the watch time and interval on YouTube
 // @author       Oscar Cai
 // @match        http://*.youtube.com/*
 // @match        https://*.youtube.com/*
+// @updateURL    https://github.com/blackmonkey/my_tools/blob/master/script/AutoClose%20YouTube.user.js?raw=true
 // @resource     ok_bg  https://github.com/blackmonkey/my_tools/blob/master/imgs/xiaobanlong_okay.png?raw=true
 // @resource     nok_bg https://github.com/blackmonkey/my_tools/blob/master/imgs/xiaobanlong_warning.png?raw=true
 // @grant        GM.setValue
