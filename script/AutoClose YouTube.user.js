@@ -7,6 +7,8 @@
 // @match        http://*.youtube.com/*
 // @match        https://*.youtube.com/*
 // @updateURL    https://github.com/blackmonkey/my_tools/blob/master/script/AutoClose%20YouTube.user.js?raw=true
+// @downloadURL  https://github.com/blackmonkey/my_tools/blob/master/script/AutoClose%20YouTube.user.js?raw=true
+// @supportURL   https://github.com/blackmonkey/my_tools/blob/master/script/AutoClose%20YouTube.user.js
 // @resource     ok_bg  https://github.com/blackmonkey/my_tools/blob/master/imgs/xiaobanlong_okay.png?raw=true
 // @resource     nok_bg https://github.com/blackmonkey/my_tools/blob/master/imgs/xiaobanlong_warning.png?raw=true
 // @grant        GM.setValue
